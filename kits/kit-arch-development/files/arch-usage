@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-usage
+
+curl_args_default="--silent --show-error --fail-with-body"
+curl_args_str=${CURL_ARGS:-$curl_args_default}
+# shellcheck disable=SC2206
+curl_args=($curl_args_str)
+
+usage() {
+  cat << EOF >&2
+Usage: $argv0 [options...] [pkgname...]
+
+Prints package statistics from https://pkgstats.archlinux.de/
+for Arch Linux packages, and number of votes for AUR packages.
+
+Options:
+  -h, --header    Print header
+  -h, --help      Display this help message and exit
+
+Environment variables:
+  CURL_ARGS   Arguments to curl
+              default: $curl_args_default
+EOF
+}
+
+header=0
+
+opt_short='h'
+opt_long='help,header'
+if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
+  eval set -- "$opts"
+fi
+
+while true; do
+  case $1 in
+  --header)
+    header=1
+    ;;
+  -h | --help)
+    usage
+    exit
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+tmpfile=$(mktemp)
+for pkg in "$@"; do
+  pkgstats=$(
+    curl "${curl_args[@]}" \
+      "https://pkgstats.archlinux.de/api/packages/$pkg" \
+      | jq -r '[.count, .popularity] | join(" ")'
+  )
+  aurvotes=$(
+    curl "${curl_args[@]}" \
+      "https://aur.archlinux.org/rpc/v5/info?arg[]=$pkg" \
+      | jq -r '.results[0].NumVotes'
+  )
+  [ "$aurvotes" = "null" ] && aurvotes=-
+  echo "$pkg $pkgstats $aurvotes" >> "$tmpfile"
+done
+
+if [ $header = 1 ]; then
+  {
+    echo "pkgname pkgstats_n pkgstats_% aur_votes"
+    sort --reverse --numeric --key=2 "$tmpfile"
+  } | column --table
+else
+  sort --reverse --numeric --key=2 "$tmpfile" | column --table
+fi

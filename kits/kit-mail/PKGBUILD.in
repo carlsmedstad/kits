@@ -1,0 +1,33 @@
+pkgname=kit-mail
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit setting up mail using aerc"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-mail"
+license=('MIT')
+depends=(
+  aerc
+  pass
+  protonmail-bridge-core
+)
+_catppuccin_aerc_ver=ca404a9f2d125ef12db40db663d43c9d94116a05
+source=(
+  "$pkgname-$pkgver.tar.gz"
+  "aerc-$_catppuccin_aerc_ver.tar.gz::https://github.com/catppuccin/aerc/archive/$_catppuccin_aerc_ver.tar.gz"
+  "$pkgname-aerc-more-color.patch"
+)
+sha256sums=(
+  'SKIP'
+  '6e4c9246a2abbf026fc6678f5a322be167991208ec9c4010b19273fafedd6610'
+  'a88660587246769a74149b008ff6c91bd517d310875528f06a1c44fff0e5e3a2'
+)
+
+prepare() {
+  cd aerc-$_catppuccin_aerc_ver
+  patch -Np1 -i ../$pkgname-aerc-more-color.patch
+}
+
+package() {
+  install -vDm644 -t "$pkgdir/usr/share/aerc/stylesets" \
+    aerc-$_catppuccin_aerc_ver/dist/catppuccin-mocha
+}

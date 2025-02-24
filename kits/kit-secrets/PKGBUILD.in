@@ -1,0 +1,28 @@
+pkgname=kit-secrets
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit for handling secrets"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-secrets"
+license=('MIT')
+depends=(
+  bitwarden-cli
+  git-credential-gopass
+  gnupg
+  gopass
+)
+provides=(pass)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/bw-sync
+
+  install -vDm644 files/pinentry-preexec.sh "$pkgdir/etc/pinentry/preexec"
+
+  # Shadow ssh and update startup TTY before running.
+  install -vDm755 -t "$pkgdir/usr/local/bin" files/ssh
+  # Shadow pass with gopass.
+  ln -vs /usr/bin/gopass "$pkgdir/usr/local/bin/pass"
+}

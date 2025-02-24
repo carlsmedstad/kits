@@ -1,0 +1,25 @@
+diff '--color=auto' --unified --recursive --text --new-file aerc-ca404a9f2d125ef12db40db663d43c9d94116a05.orig/dist/catppuccin-mocha aerc-ca404a9f2d125ef12db40db663d43c9d94116a05/dist/catppuccin-mocha
+--- aerc-ca404a9f2d125ef12db40db663d43c9d94116a05.orig/dist/catppuccin-mocha	2025-02-24 00:22:34.431669981 +0200
++++ aerc-ca404a9f2d125ef12db40db663d43c9d94116a05/dist/catppuccin-mocha	2025-02-24 00:23:02.713564545 +0200
+@@ -9,8 +9,8 @@
+ 
+ tab.fg=#6c7086
+ tab.bg=#181825
+-tab.selected.fg=#cdd6f4
+-tab.selected.bg=#1e1e2e
++tab.selected.fg=#181825
++tab.selected.bg=#89b4fa
+ tab.selected.bold=true
+ 
+ border.fg=#11111b
+@@ -27,8 +27,8 @@
+ dirlist_*.selected.bold=true
+ dirlist_*.selected.bg=#313244
+ 
+-statusline_default.fg=#9399b2
+-statusline_default.bg=#313244
++statusline_default.fg=#cdd6f4
++statusline_default.bg=#181825
+ statusline_error.bold=true
+ statusline_success.bold=true
+ 

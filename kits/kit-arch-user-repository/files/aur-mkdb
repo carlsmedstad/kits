@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+
+aur_dbroot=${AUR_DBROOT:-/var/lib/repo}
+aur_repo=${AUR_REPO:-custom}
+db_path="$aur_dbroot/$aur_repo/$aur_repo.db.tar.gz"
+
+sudo install --owner "$(id --user)" --group "$(id --group)" \
+  --directory "$aur_dbroot/$aur_repo"
+repo-add "$db_path"

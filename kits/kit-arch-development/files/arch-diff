@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-diff
+
+diff_args_str=${DIFF_ARGS:-"--unified --recursive --text --new-file"}
+# shellcheck disable=SC2206
+diff_args=($diff_args_str)
+
+usage() {
+  printf >&2 'usage: %s <path>\n' "$argv0"
+}
+
+[ "$#" -ne 1 ] && {
+  usage
+  exit 1
+}
+
+archive=${1:?}
+
+archive_root=$(dirname "$archive")
+archive_name=$(basename "$archive")
+
+[ -d "$archive_name.orig" ] || {
+  printf >&2 '%s: %s: does not exist\n' "$argv0" "$archive_name.orig"
+  exit 1
+}
+
+cd "$archive_root"
+diff "${diff_args[@]}" "$archive_name.orig" "$archive_name" || :

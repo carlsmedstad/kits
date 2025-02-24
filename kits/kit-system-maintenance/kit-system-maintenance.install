@@ -1,0 +1,7 @@
+# shellcheck shell=bash
+
+post_install() {
+  echo "To enable TLP, run:"
+  echo ""
+  echo "  sudo systemctl enable --now tlp"
+}

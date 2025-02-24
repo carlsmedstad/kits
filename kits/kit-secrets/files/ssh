@@ -1,0 +1,4 @@
+#!/bin/sh
+
+gpg-connect-agent updatestartuptty /bye > /dev/null
+exec /usr/bin/ssh "$@"

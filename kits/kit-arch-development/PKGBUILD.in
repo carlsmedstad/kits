@@ -1,0 +1,26 @@
+pkgname=kit-arch-development
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit installing useful packages for Arch Linux development"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-arch-development"
+license=('MIT')
+depends=(
+  archlinux-contrib
+  archlinux-repro
+  base-devel
+  devtools
+  nvchecker
+  pkgstats
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-diff
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-ls
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-usage
+
+  install -vDm644 -t "$pkgdir/etc/archlinux-repro" files/repro.conf
+}

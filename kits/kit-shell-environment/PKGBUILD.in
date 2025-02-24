@@ -1,0 +1,19 @@
+pkgname=kit-shell-environment
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit for shell environment based on Fish shell"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-shell"
+license=('MIT')
+depends=(
+  fd
+  fish
+  fisher
+  fzf
+  git
+  man-db
+  openssh
+  ripgrep
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')

@@ -1,0 +1,50 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=bw-sync
+
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+config_file="$config_home/$argv0.ini"
+
+[ ! -f "$config_file" ] && {
+  printf >&2 '%s: %s: does not exist\n' "$argv0" "$config_file"
+  exit 1
+}
+
+tmpfile=$(mktemp)
+chmod 600 "$tmpfile"
+
+trap 'bw lock; unset BW_SESSION; rm -f $tmpfile' EXIT
+BW_SESSION=$(bw unlock --raw)
+export BW_SESSION
+
+bw sync
+
+section=
+while IFS='= ' read -r key value; do
+  [[ -z $key || $key =~ ^# ]] && continue
+  [[ $key =~ ^\[.*\]$ ]] && {
+    section="${key:1:-1}"
+    continue
+  }
+  [ -z "$section" ] && {
+    printf >&2 '%s: %s: entry without section\n' "$argv0" "$key"
+    exit 1
+  }
+
+  case "$section" in
+  pass)
+    password=$(bw get password "$key")
+    pass insert --multiline --force "$value" <<< "$password"
+    ;;
+  gpg)
+    bw get attachment "$value" --itemid "$key" --output "$tmpfile"
+    gpg --import "$tmpfile"
+    ;;
+  *)
+    printf >&2 '%s: %s: invalid section\n' "$argv0" "$section"
+    exit 1
+    ;;
+  esac
+done < "$config_file"

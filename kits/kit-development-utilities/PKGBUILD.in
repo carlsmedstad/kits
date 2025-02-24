@@ -1,0 +1,18 @@
+pkgname=kit-development-utilities
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit containing development maintenance utilites"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-development-utilities"
+license=('MIT')
+depends=(
+  ghq
+  libnotify
+  markdownlint-cli
+  podman
+  shellcheck
+  shfmt
+  xorg-xeyes
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')

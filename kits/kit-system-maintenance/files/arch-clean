@@ -1,0 +1,45 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-clean
+
+usage() {
+  printf >&2 'usage: %s {orphans|paccache|images}\n' "$argv0"
+}
+
+command=${1:-}
+
+case $command in
+orphans)
+  if pacman -Qtdq > /dev/null; then
+    printf >&2 '%s: removing orphans\n' "$argv0"
+    # shellcheck disable=2046
+    sudo pacman -Rns $(pacman -Qtdq)
+  else
+    printf >&2 '%s: no orphans to remove\n' "$argv0"
+  fi
+  ;;
+paccache)
+  sudo paccache --cachedir /var/cache/pacman/pkg/ --keep 1 --remove
+  sudo paccache --cachedir /var/cache/pacman/pkg/ --keep 0 --remove --uninstalled
+  ;;
+images)
+  container_engine=
+  command -v docker > /dev/null && container_engine=docker
+  command -v podman > /dev/null && container_engine=podman
+  if [ -z "$container_engine" ]; then
+    printf >&2 '%s: no container engine found\n' "$argv0"
+    exit 1
+  fi
+
+  $container_engine ps --all --quiet \
+    | xargs --no-run-if-empty "$container_engine" rm
+  $container_engine images --all --quiet \
+    | xargs --no-run-if-empty "$container_engine" rmi --force
+  ;;
+*)
+  usage
+  exit 1
+  ;;
+esac

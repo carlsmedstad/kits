@@ -1,0 +1,10 @@
+# shellcheck shell=bash
+
+post_install() {
+  echo "Manual steps required to set up aurutils:"
+  echo ""
+  echo "  1. Run aur-mkarchroot and aur-mkdb."
+  echo "  2. Add the following line to /etc/pacman.conf:"
+  echo ""
+  echo "       Include = /etc/pacman.d/aur.conf"
+}

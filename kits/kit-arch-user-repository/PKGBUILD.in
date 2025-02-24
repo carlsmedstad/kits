@@ -1,0 +1,35 @@
+pkgname=kit-arch-user-repository
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit installing a Catppuccin Mocha themed aurutils with icons"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-aur"
+license=('MIT')
+depends=(
+  aurutils
+  ttf-nerd-fonts-symbols
+  vifm
+)
+install=$pkgname.install
+_vifm_devicons_ver=a32bf0da4b14337759468a08775abf3cf1c90a90
+source=(
+  "$pkgname-$pkgver.tar.gz"
+  "vifm_devicons-$_vifm_devicons_ver.tar.gz::https://github.com/thimc/vifm_devicons/archive/$_vifm_devicons_ver.tar.gz"
+)
+sha256sums=(
+  'SKIP'
+  '53dace353e378e9a7dffc78f5c5c40e9df7c3901209fbb39a10a2b424cc68354'
+)
+
+package() {
+  install -vDm644 -t "$pkgdir/etc/vifm" vifm_devicons-$_vifm_devicons_ver/favicons.vifm
+
+  cd $pkgname-$pkgver
+  install -vDm644 -t "$pkgdir/etc/vifm" files/vifmrc
+  install -vDm644 -t "$pkgdir/etc/vifm/colors" files/catppuccin-mocha.vifm
+
+  install -vDm755 -t "$pkgdir/usr/bin" files/aur-mkarchroot
+  install -vDm755 -t "$pkgdir/usr/bin" files/aur-mkdb
+
+  install -vDm644 -t "$pkgdir/etc/pacman.d" files/aur.conf
+}

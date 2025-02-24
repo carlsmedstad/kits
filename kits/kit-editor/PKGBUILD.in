@@ -1,0 +1,16 @@
+pkgname=kit-editor
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit installing the editor Neovim"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-editor"
+license=('MIT')
+depends=(neovim)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/nvim-lazy-update
+  install -vDm755 -t "$pkgdir/usr/bin" files/nvim-mkspell
+}

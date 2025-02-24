@@ -1,0 +1,82 @@
+pkgname=kit-desktop-environment
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit for a Catppuccin themed Sway"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-desktop-environment"
+license=('MIT AND LicenseRef-Unsplash')
+depends=(
+  acpilight
+  alacritty
+  bemenu-wayland
+  gopass
+  greetd
+  grim
+  handlr-regex
+  i3status-rust
+  j4-dmenu-desktop
+  jq
+  mako
+  otf-font-awesome
+  pamixer
+  pipewire-pulse
+  playerctl
+  slurp
+  sway
+  swaybg
+  swayidle
+  swayimg
+  swaylock
+  wl-clipboard
+  wlsunset
+  wob
+  xdg-user-dirs
+  xorg-xwayland
+)
+install=$pkgname.install
+_catppuccin_i3_ver=c072ada05271eec960dc893affe9ac55af63a745
+_catppuccin_alacritty_ver=f6cb5a5c2b404cdaceaff193b9c52317f62c62f7
+source=(
+  "$pkgname-$pkgver.tar.gz"
+  "i3-$_catppuccin_i3_ver.tar.gz::https://github.com/catppuccin/i3/archive/$_catppuccin_i3_ver.tar.gz"
+  "alacritty-$_catppuccin_alacritty_ver.tar.gz::https://github.com/catppuccin/alacritty/archive/$_catppuccin_alacritty_ver.tar.gz"
+)
+sha256sums=(
+  'SKIP'
+  'ac8f80107e106df8182feda5ed5b153423512ed8634d1ccf90b3a509cc0c7f17'
+  '6194d5d5e36d4e16d2ebe1d5ff9d8315811aedb045abee571acf9c7e3973d5de'
+)
+
+package() {
+  install -vDm644 i3-$_catppuccin_i3_ver/themes/catppuccin-mocha \
+    "$pkgdir/usr/share/themes/sway/catppuccin-mocha"
+  install -vDm644 alacritty-$_catppuccin_alacritty_ver/catppuccin-mocha.toml \
+    "$pkgdir/usr/share/themes/alacritty/catppuccin-mocha.toml"
+
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/dmenu
+  install -vDm755 -t "$pkgdir/usr/bin" files/launch-sway
+  install -vDm755 -t "$pkgdir/usr/bin" files/printscreen
+
+  install -vDm755 -t "$pkgdir/usr/local/bin" files/xdg-open
+
+  install -vDm644 files/gtk-3.0-settings.ini "$pkgdir/etc/gtk-3.0/settings.ini"
+  install -vDm644 files/60-fonts-aliases.conf \
+    "$pkgdir/etc/fonts/conf.d/60-fonts-aliases.conf"
+
+  install -vDm644 files/greetd.toml "$pkgdir/etc/greetd/config.toml"
+  install -vDm644 files/sway.conf "$pkgdir/etc/sway/kit.conf"
+  install -vDm644 files/evening-sky.png \
+    "$pkgdir/usr/share/backgrounds/sway/evening-sky.png"
+  install -vDm644 files/swayimg.ini "$pkgdir/etc/xdg/swayimg/config"
+  install -vDm644 files/swaylock.ini "$pkgdir/etc/swaylock/config"
+  install -vDm644 files/wob.ini "$pkgdir/etc/wob/wob.ini"
+  install -vDm644 files/mako.ini "$pkgdir/etc/mako/config"
+
+  install -vDm644 files/i3status-rust.toml \
+    "$pkgdir/usr/share/i3status-rust/config.toml"
+  install -vDm644 files/i3status-rust-ctp-mocha-dark.toml \
+    "$pkgdir/usr/share/i3status-rust/themes/ctp-mocha-dark.toml"
+
+  install -vDm644 files/alacritty.toml "$pkgdir/etc/alacritty/alacritty.toml"
+}

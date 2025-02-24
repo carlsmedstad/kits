@@ -1,0 +1,20 @@
+pkgname=kit-system-maintenance
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit containing system maintenance utilites"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-system-maintenance"
+license=('MIT')
+depends=(
+  fwupd
+  pacman-contrib
+  tlp
+  udisks2
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
+}

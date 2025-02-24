@@ -1,0 +1,23 @@
+pkgname=kit-base-system
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit for base system"
+arch=('any')
+url="https://github.com/carlsmedstad/kit-base-system"
+license=('MIT')
+depends=(
+  base
+  iwd
+  linux
+  linux-firmware
+  lvm2
+  sudo
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
+  install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
+}

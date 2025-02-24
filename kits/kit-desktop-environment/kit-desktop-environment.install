@@ -1,0 +1,9 @@
+# shellcheck shell=bash
+
+post_install() {
+  echo "Manual step required to enable Sway configuration:"
+  echo ""
+  echo "  1. Back-up /etc/sway/config"
+  echo "  2. Run 'sudo ln -rfs /etc/sway/kit.conf /etc/sway/config'"
+  echo "  3. Run 'sudo usermod -aG video $USER'"
+}
