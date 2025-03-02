@@ -11,13 +11,13 @@ curl_args=($curl_args_str)
 
 usage() {
   cat << EOF >&2
-Usage: $argv0 [options...] [repository]
+Usage: $argv0 [options...] [repository...]
 
-Lists packages for a maintainer from Arch Linux repositories.
+Lists packages in specified Arch Linux repositories maintained by
+a particlar user.
 
 Allowed repository values:
-  core core-testing extra extra-testing
-  multilib multilib-testing aur official
+  core core-testing extra extra-testing multilib multilib-testing
 
 Options:
   -m, --maintainer <user> Maintainer's packages to list
@@ -31,13 +31,14 @@ Environment variables:
               default: $curl_args_default
 
 Examples:
-  $argv0 extra
-  $argv0 --jq-query '.pkgbase' extra-testing
-  $argv0 --maintainer carsme aur
+  $argv0 core extra
+  $argv0 --jq-query .pkgbase extra-testing
+  $argv0 --maintainer carsme extra
 EOF
 }
 
 maintainer=$USER
+jq_query=.pkgname
 
 opt_short='m:j:h'
 opt_long='maintainer:,jq-query:,help'
@@ -70,60 +71,50 @@ while true; do
   shift
 done
 
-[ "$#" -ne 1 ] && {
+if [ "$#" -eq 0 ]; then
   printf >&2 '%s: no repository supplied\n' "$argv0"
   exit 1
+fi
+
+validate_repo() {
+  local repo=$1
+  local allowed_repos=(
+    core
+    core-testing
+    extra
+    extra-testing
+    multilib
+    multilib-testing
+  )
+
+  if [[ ! ${allowed_repos[*]} =~ $repo ]]; then
+    printf >&2 '%s: %s: invalid repository\n' "$argv0" "$repo"
+    exit 1
+  fi
 }
-repo=${1:?}
 
-if [ -z "${jq_query:-}" ] && [ "$repo" = "aur" ]; then
-  jq_query=.Name
-else
-  jq_query=.pkgname
-fi
-
-repos_official=(
-  core
-  core-testing
-  extra
-  extra-testing
-  multilib
-  multilib-testing
-)
-repos_others=(
-  aur
-  official
-)
-repo_allowed_values=("${repos_official[*]}" "${repos_others[*]}")
-
-if [[ ! ${repo_allowed_values[*]} =~ $repo ]]; then
-  printf >&2 '%s: %s: invalid repository\n' "$argv0" "$repo"
-  exit 1
-fi
-
-case "$repo" in
-core)
-  repo_cased=Core
-  ;;
-core-testing)
-  repo_cased=Core-Testing
-  ;;
-extra)
-  repo_cased=Extra
-  ;;
-extra-testing)
-  repo_cased=Extra-Testing
-  ;;
-multilib)
-  repo_cased=Multilib
-  ;;
-multilib-testing)
-  repo_cased=Multilib-Testing
-  ;;
-*)
-  repo_cased=$repo
-  ;;
-esac
+fix_repo_casing() {
+  case "$1" in
+  core)
+    echo Core
+    ;;
+  core-testing)
+    echo Core-Testing
+    ;;
+  extra)
+    echo Extra
+    ;;
+  extra-testing)
+    echo Extra-Testing
+    ;;
+  multilib)
+    echo Multilib
+    ;;
+  multilib-testing)
+    echo Multilib-Testing
+    ;;
+  esac
+}
 
 call_rpc_process_response() {
   local url=${1:?}
@@ -138,16 +129,10 @@ call_rpc_process_response() {
 }
 
 {
-  if [ "$repo" = aur ]; then
-    aur_rpc_search_url="https://aur.archlinux.org/rpc/?v=5&type=search"
-    call_rpc_process_response "$aur_rpc_search_url&by=maintainer&arg=$maintainer"
-    call_rpc_process_response "$aur_rpc_search_url&by=comaintainers&arg=$maintainer"
-  fi
-  arch_rpc_search_url="https://archlinux.org/packages/search/json/"
-  if [ "$repo" = official ]; then
-    call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer"
-  fi
-  if [[ ${repos_official[*]} =~ $repo ]]; then
+  for repo in "$@"; do
+    validate_repo "$repo"
+    repo_cased=$(fix_repo_casing "$repo")
+    arch_rpc_search_url="https://archlinux.org/packages/search/json/"
     call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer&repo=$repo_cased"
-  fi
+  done
 } | sort | uniq
