@@ -25,4 +25,6 @@ package() {
   install -vDm755 -t "$pkgdir/usr/local/bin" files/ssh
   # Shadow pass with gopass.
   ln -vs /usr/bin/gopass "$pkgdir/usr/local/bin/pass"
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

@@ -52,6 +52,8 @@ package() {
     "$pkgdir/usr/share/themes/sway/catppuccin-mocha"
   install -vDm644 alacritty-$_catppuccin_alacritty_ver/catppuccin-mocha.toml \
     "$pkgdir/usr/share/themes/alacritty/catppuccin-mocha.toml"
+  install -vDm644 alacritty-$_catppuccin_alacritty_ver/LICENSE \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE-catppuccin"
 
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/dmenu
@@ -79,4 +81,6 @@ package() {
     "$pkgdir/usr/share/i3status-rust/themes/ctp-mocha-dark.toml"
 
   install -vDm644 files/alacritty.toml "$pkgdir/etc/alacritty/alacritty.toml"
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

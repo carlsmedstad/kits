@@ -13,4 +13,6 @@ package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/nvim-lazy-update
   install -vDm755 -t "$pkgdir/usr/bin" files/nvim-mkspell
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

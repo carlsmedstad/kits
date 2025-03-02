@@ -4,7 +4,10 @@ pkgrel=1
 pkgdesc="Kit installing a Catppuccin Mocha themed aurutils with icons"
 arch=('any')
 url="https://github.com/carlsmedstad/kit-aur"
-license=('MIT')
+license=(
+  'GPL-3.0-only'
+  'MIT'
+)
 depends=(
   aurutils
   ttf-nerd-fonts-symbols
@@ -32,4 +35,6 @@ package() {
   install -vDm755 -t "$pkgdir/usr/bin" files/aur-mkdb
 
   install -vDm644 -t "$pkgdir/etc/pacman.d" files/aur.conf
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

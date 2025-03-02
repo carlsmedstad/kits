@@ -17,4 +17,6 @@ sha256sums=('SKIP')
 package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

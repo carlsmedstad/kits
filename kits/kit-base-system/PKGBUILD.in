@@ -20,4 +20,6 @@ package() {
   cd $pkgname-$pkgver
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }

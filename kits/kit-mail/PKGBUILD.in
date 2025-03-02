@@ -28,6 +28,10 @@ prepare() {
 }
 
 package() {
-  install -vDm644 -t "$pkgdir/usr/share/aerc/stylesets" \
-    aerc-$_catppuccin_aerc_ver/dist/catppuccin-mocha
+  cd "$srcdir/aerc-$_catppuccin_aerc_ver"
+  install -vDm644 -t "$pkgdir/usr/share/aerc/stylesets" dist/catppuccin-mocha
+  install -vDm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-catppuccin"
+
+  cd "$srcdir/$pkgname-$pkgver"
+  install -vDm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-kit"
 }
