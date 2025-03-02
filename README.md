@@ -62,6 +62,13 @@ Kits installing fundamental stuff:
   featured with login manager, launcher, bar, theme, and so on. Comes with the
   terminal emulator [Alacritty][].
 
+After installing the kits above and following the post-install instructions,
+you should end up with a desktop environment looking like this:
+
+![Screenshot](doc/screenshot.png)
+
+Note the small number of explicitly installed packages.
+
 Kits installing applications:
 
 - **kit-editor:** Installs the editor [Neovim][] along with some helper
