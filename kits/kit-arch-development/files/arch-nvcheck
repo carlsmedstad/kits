@@ -1,0 +1,67 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-nvcheck
+
+cache_home=${XDG_CACHE_HOME:-$HOME/.cache}
+cache_dir=$cache_home/$argv0
+
+usage() {
+  cat << EOF >&2
+Usage: $argv0 [options...]
+
+Check for upstream updates for all packages maintained by the
+specified package maintainer.
+
+Options:
+  -m, --maintainer <user> Maintainer's packages to check
+                          default: \$USER
+  -h, --help              Display this help message and exit
+EOF
+}
+
+maintainer=$USER
+
+opt_short='m:h'
+opt_long='maintainer:,help'
+if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
+  eval set -- "$opts"
+fi
+
+while true; do
+  case $1 in
+  -m | --maintainer)
+    shift
+    maintainer=${1:-}
+    ;;
+  -h | --help)
+    usage
+    exit
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+mkdir -p "$cache_dir"
+cd "$cache_dir"
+
+repos=(core core-testing extra extra-testing multilib multilib-testing)
+arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
+  > "$cache_dir/pkgs.txt"
+
+cp -f /dev/null "$cache_dir/pkgs.missing.txt"
+while read -r pkg; do
+  [ -d "$pkg" ] || echo "$pkg" >> "$cache_dir/pkgs.missing.txt"
+done < "$cache_dir/pkgs.txt"
+
+xargs -a "$cache_dir/pkgs.missing.txt" --no-run-if-empty pkgctl repo clone
+xargs -a "$cache_dir/pkgs.txt" -P8 -I{} git -C {} pull
+xargs -a "$cache_dir/pkgs.txt" pkgctl version check

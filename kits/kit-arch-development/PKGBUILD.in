@@ -13,6 +13,8 @@ depends=(
   namcap
   nvchecker
   pkgstats
+  python-lxml # nvchecker optdep
+  python-packaging # nvchecker optdep
 )
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
@@ -21,6 +23,7 @@ package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-diff
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-ls
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-nvcheck
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-usage
 
   install -vDm644 -t "$pkgdir/etc/archlinux-repro" files/repro.conf
