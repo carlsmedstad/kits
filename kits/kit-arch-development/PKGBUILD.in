@@ -6,6 +6,7 @@ arch=('any')
 url="https://github.com/carlsmedstad/kit-arch-development"
 license=('MIT')
 depends=(
+  arch-rebuild-order
   archlinux-contrib
   archlinux-repro
   base-devel
