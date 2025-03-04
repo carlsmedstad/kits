@@ -21,6 +21,7 @@ depends=(
   pamixer
   pipewire-pulse
   playerctl
+  shikane
   slurp
   sway
   swaybg
