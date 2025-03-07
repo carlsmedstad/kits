@@ -71,6 +71,16 @@ key = "J"
 mods = "Control|Shift"
 
 [[keyboard.bindings]]
+action = "ScrollPageUp"
+key = "U"
+mods = "Control|Shift"
+
+[[keyboard.bindings]]
+action = "ScrollPageDown"
+key = "D"
+mods = "Control|Shift"
+
+[[keyboard.bindings]]
 action = "SpawnNewInstance"
 key = "T"
 mods = "Control|Shift"
