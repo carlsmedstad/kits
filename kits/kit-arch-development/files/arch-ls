@@ -119,11 +119,11 @@ fix_repo_casing() {
 call_rpc_process_response() {
   local url=${1:?}
   response=$(curl "${curl_args[@]}" "$url")
-  echo "$response" | jq -rc ".results[]$jq_query"
+  echo "$response" | jq -rc ".results[] | $jq_query"
   num_pages=$(echo "$response" | jq -r .num_pages)
   if [ "$num_pages" != null ]; then
     for page in $(seq 2 "$num_pages"); do
-      curl "${curl_args[@]}" "$url&page=$page" | jq -rc ".results[]$jq_query"
+      curl "${curl_args[@]}" "$url&page=$page" | jq -rc ".results[] | $jq_query"
     done
   fi
 }
