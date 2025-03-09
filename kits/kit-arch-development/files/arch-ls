@@ -20,11 +20,13 @@ Allowed repository values:
   core core-testing extra extra-testing multilib multilib-testing
 
 Options:
-  -m, --maintainer <user> Maintainer's packages to list
-                          default: \$USER
-  -j, --jq-query <query>  Query to apply to results
-                          default: '.pkgname' ('.Name' for AUR)
-  -h, --help              Display this help message and exit
+  -m, --maintainer <user>   Maintainer's packages to list
+                            default: \$USER
+  -f, --flagged yes|no|any  Show only flagged packages
+                            default: any
+  -j, --jq-query <query>    Query to apply to results
+                            default: '.pkgname' ('.Name' for AUR)
+  -h, --help                Display this help message and exit
 
 Environment variables:
   CURL_ARGS   Arguments to curl
@@ -38,10 +40,11 @@ EOF
 }
 
 maintainer=$USER
+flagged=any
 jq_query=.pkgname
 
-opt_short='m:j:h'
-opt_long='maintainer:,jq-query:,help'
+opt_short='m:f:j:h'
+opt_long='maintainer:,flagged:,jq-query:,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -51,6 +54,10 @@ while true; do
   -m | --maintainer)
     shift
     maintainer=${1:-}
+    ;;
+  -f | --flagged)
+    shift
+    flagged=${1:-}
     ;;
   -j | --jq-query)
     shift
@@ -76,22 +83,19 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
-validate_repo() {
-  local repo=$1
-  local allowed_repos=(
-    core
-    core-testing
-    extra
-    extra-testing
-    multilib
-    multilib-testing
-  )
+validate_value() {
+  local value=$1
+  shift
+  local allowed_values=("$@")
 
-  if [[ ! ${allowed_repos[*]} =~ $repo ]]; then
-    printf >&2 '%s: %s: invalid repository\n' "$argv0" "$repo"
+  if [[ ! ${allowed_values[*]} =~ $value ]]; then
+    printf >&2 '%s: %s: invalid value\n' "$argv0" "$value"
     exit 1
   fi
 }
+
+allowed_flagged=(yes no any)
+validate_value "$flagged" "${allowed_flagged[@]}"
 
 fix_repo_casing() {
   case "$1" in
@@ -128,11 +132,16 @@ call_rpc_process_response() {
   fi
 }
 
+flagged_param=""
+[ "$flagged" = yes ] && flagged_param="&flagged=Flagged"
+[ "$flagged" = no ] && flagged_param="&flagged=Not+Flagged"
+
 {
   for repo in "$@"; do
-    validate_repo "$repo"
+    allowed_repo=(core core-testing extra extra-testing multilib multilib-testing)
+    validate_value "$repo" "${allowed_repo[@]}"
     repo_cased=$(fix_repo_casing "$repo")
     arch_rpc_search_url="https://archlinux.org/packages/search/json/"
-    call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer&repo=$repo_cased"
+    call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer&repo=$repo_cased$flagged_param"
   done
 } | sort | uniq
