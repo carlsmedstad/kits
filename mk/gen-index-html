@@ -1,0 +1,29 @@
+#!/bin/sh -eu
+
+dir=${1:?}
+
+cat << EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Repository Index</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <h1>Repository Index</h1>
+  <ul>
+EOF
+
+find "$dir" -type f -not -path '*/.*' \
+  | LC_ALL=C sort \
+  | while IFS= read -r abs_path; do
+    rel_path=${abs_path#"$dir"/}
+    printf '    <li><a href="%s">%s</a></li>\n' "$rel_path" "$rel_path"
+  done
+
+cat << EOF
+  </ul>
+</body>
+</html>
+EOF
