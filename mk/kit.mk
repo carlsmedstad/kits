@@ -35,4 +35,4 @@ uninstall:
 
 .PHONY: clean
 clean:
-	rm -rf *.pkg.tar.zst *.tar.gz PKGBUILD pkg/ src/
+	rm -rf ./*.pkg.tar.zst ./*.tar.gz ./PKGBUILD ./pkg/ ./src/
