@@ -30,6 +30,9 @@ $(PKGFILE).sig: archive PKGBUILD
 .PHONY: package
 package: $(PKGFILE)
 
+.PHONY: package-signed
+package-signed: $(PKGFILE).sig
+
 .PHONY: install
 install: $(PKGFILE)
 	sudo pacman -U $<
