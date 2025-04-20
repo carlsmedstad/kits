@@ -109,13 +109,30 @@ Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
 ## Installation
 
-Build and install a kit from this repository by running:
+### Install pre-built kits with pacman
+
+To install pre-built packages from the custom repository at
+<https://carlsmedstad.github.io/kits/>, add the following to your
+`pacman.conf`:
+
+```ini
+[kits]
+Server = https://carlsmedstad.github.io/kits
+```
+
+And install the kits as you would any other package:
+
+```sh
+sudo pacman -Syu <kit>
+```
+
+### Build kits from source with makepkg
+
+To build and install a kit from source using makepkg, run:
 
 ```sh
 make install-<kit>
 ```
-
-After installation, follow the post-installation steps declared in the notice.
 
 Uninstall by running:
 
