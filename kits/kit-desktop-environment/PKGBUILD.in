@@ -6,9 +6,9 @@ arch=('any')
 url="https://github.com/carlsmedstad/kit-desktop-environment"
 license=('MIT AND LicenseRef-Unsplash')
 depends=(
-  acpilight
   alacritty
   bemenu-wayland
+  brightnessctl
   gopass
   greetd
   grim
