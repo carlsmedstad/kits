@@ -41,7 +41,8 @@ PKGFILES = $(foreach kit,$(KITS),kits/$(kit)/$(kit)-$(PKGVER)-1-any.pkg.tar.zst)
 
 .PHONY: gh-pages-stage-packages
 gh-pages-stage-packages: $(PKGFILES)
-	install -Dm644 -t gh-pages $^ $(addsuffix .sig,$^)
+	rm -vf ./gh-pages/*.pkg.tar.zst ./gh-pages/*.pkg.tar.zst.sig || true
+	install -vDm644 -t gh-pages $^ $(addsuffix .sig,$^)
 	repo-add $(REPO_ADD_ARGS) gh-pages/$(REPONAME).db.tar.gz $^
 	./mk/gen-index-html gh-pages > gh-pages/index.html
 	git -C gh-pages add '*'
