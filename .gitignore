@@ -4,3 +4,5 @@
 PKGBUILD
 pkg/
 src/
+repo/
+gh-pages/
