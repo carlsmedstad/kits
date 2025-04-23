@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# shellcheck disable=SC2155
+export ARCHWEB_PASSWORD="$(gopass show "archlinux.org/$ARCHWEB_USERNAME/password")"
+
+exec /usr/bin/signoff "$@"

@@ -27,6 +27,8 @@ package() {
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-nvcheck
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-usage
 
+  install -vDm755 -t "$pkgdir/usr/local/bin" files/signoff
+
   install -vDm644 -t "$pkgdir/etc/archlinux-repro" files/repro.conf
 
   install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
