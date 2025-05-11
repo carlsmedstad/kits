@@ -105,17 +105,30 @@ fix_repo_casing() {
   core-testing)
     echo Core-Testing
     ;;
+  core-staging)
+    echo Core-Staging
+    ;;
   extra)
     echo Extra
     ;;
   extra-testing)
     echo Extra-Testing
     ;;
+  extra-staging)
+    echo Extra-Staging
+    ;;
   multilib)
     echo Multilib
     ;;
   multilib-testing)
     echo Multilib-Testing
+    ;;
+  multilib-staging)
+    echo Multilib-Staging
+    ;;
+  *)
+    printf >&2 '%s: %s: invalid repository supplied\n' "$argv0" "$1"
+    return 1
     ;;
   esac
 }
@@ -138,8 +151,6 @@ flagged_param=""
 
 {
   for repo in "$@"; do
-    allowed_repo=(core core-testing extra extra-testing multilib multilib-testing)
-    validate_value "$repo" "${allowed_repo[@]}"
     repo_cased=$(fix_repo_casing "$repo")
     arch_rpc_search_url="https://archlinux.org/packages/search/json/"
     call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer&repo=$repo_cased$flagged_param"
