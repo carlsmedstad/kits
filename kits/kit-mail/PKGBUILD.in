@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit setting up mail using aerc"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-mail"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   aerc

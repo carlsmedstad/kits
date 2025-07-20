@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit for shell environment based on Fish shell"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-shell"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   fd

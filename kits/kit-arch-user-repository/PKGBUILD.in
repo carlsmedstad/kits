@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit installing a Catppuccin Mocha themed aurutils with icons"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-aur"
+url="https://github.com/carlsmedstad/kits"
 license=(
   'GPL-3.0-only'
   'MIT'

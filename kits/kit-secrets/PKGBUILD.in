@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit for handling secrets"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-secrets"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   bitwarden-cli

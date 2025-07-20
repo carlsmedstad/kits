@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit for base system"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-base-system"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   base

@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit containing development maintenance utilites"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-development-utilities"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   ghq

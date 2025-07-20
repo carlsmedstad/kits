@@ -3,7 +3,7 @@ pkgver=@PKGVER@
 pkgrel=1
 pkgdesc="Kit installing useful packages for Arch Linux development"
 arch=('any')
-url="https://github.com/carlsmedstad/kit-arch-development"
+url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
   arch-rebuild-order
