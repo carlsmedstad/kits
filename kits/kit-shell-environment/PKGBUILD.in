@@ -13,6 +13,7 @@ depends=(
   git
   man-db
   openssh
+  pkgfile
   ripgrep
 )
 source=("$pkgname-$pkgver.tar.gz")
