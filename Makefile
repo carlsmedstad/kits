@@ -22,7 +22,7 @@ GPGKEY ?= 69F8E5E5E85F771020A0777C3D309011083BA25E
 REPO_ADD_ARGS ?= --sign --include-sigs --new --remove --key $(GPGKEY)
 REPONAME = kits
 
-.PHONY: create-gh-pages-branch
+.PHONY: gh-pages-create-branch
 gh-pages-create-branch:
 	git show-ref --quiet refs/heads/gh-pages || { \
 		git checkout --orphan gh-pages; \
@@ -35,6 +35,11 @@ gh-pages-create-branch:
 	git -C gh-pages add '$(REPONAME).*'
 	git -C gh-pages diff --quiet --cached || \
 		git -C gh-pages commit -m "Add empty repo database"
+
+.PHONY: gh-pages-checkout-branch
+gh-pages-checkout-branch:
+	git worktree add gh-pages gh-pages || :
+	git -C gh-pages pull
 
 PKGVER = $(shell git describe --abbrev=7 | sed 's/\([^-]*-g\)/r\1/;s/-/./g')
 PKGFILES = $(foreach kit,$(KITS),kits/$(kit)/$(kit)-$(PKGVER)-1-any.pkg.tar.zst)
