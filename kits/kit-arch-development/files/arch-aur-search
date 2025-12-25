@@ -1,0 +1,113 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-aur-search
+
+curl_args_default="--silent --show-error --fail-with-body"
+curl_args_str=${CURL_ARGS:-$curl_args_default}
+# shellcheck disable=SC2206
+curl_args=($curl_args_str)
+
+usage() {
+  cat << EOF >&2
+Usage: $argv0 [options...] <keyword>
+
+Searches the AUR using the RPC interface.
+
+Options:
+  -b, --by <field>        Search field (can be specified multiple times)
+                          default: name-desc
+  -j, --jq-query <query>  Query to apply to results
+                          default: .Name
+  -h, --help              Display this help message and exit
+
+Allowed values for --by:
+  name          Package name only
+  name-desc     Package name and description
+  maintainer    Maintainer username
+  depends       Packages that depend on keyword
+  makedepends   Packages that makedepend on keyword
+  optdepends    Packages that optdepend on keyword
+  checkdepends  Packages that checkdepend on keyword
+
+Environment variables:
+  CURL_ARGS   Arguments to curl
+              default: $curl_args_default
+
+Examples:
+  $argv0 python-numpy
+  $argv0 --by depends python-numpy
+  $argv0 --by depends --by makedepends --by optdepends python-numpy
+  $argv0 --by maintainer carsme
+  $argv0 --jq-query .PackageBase python-
+EOF
+}
+
+by_fields=()
+jq_query=.Name
+
+opt_short='b:j:h'
+opt_long='by:,jq-query:,help'
+if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
+  eval set -- "$opts"
+fi
+
+while true; do
+  case $1 in
+  -b | --by)
+    shift
+    by_fields+=("${1:-}")
+    ;;
+  -j | --jq-query)
+    shift
+    jq_query=${1:-}
+    ;;
+  -h | --help)
+    usage
+    exit
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+if [ "$#" -eq 0 ]; then
+  printf >&2 '%s: no keyword supplied\n' "$argv0"
+  exit 1
+fi
+
+keyword=${1:?}
+
+# Default to name-desc if no --by specified
+if [ ${#by_fields[@]} -eq 0 ]; then
+  by_fields=(name-desc)
+fi
+
+allowed_by=(name name-desc maintainer depends makedepends optdepends checkdepends)
+for by in "${by_fields[@]}"; do
+  valid=0
+  for allowed in "${allowed_by[@]}"; do
+    if [ "$by" = "$allowed" ]; then
+      valid=1
+      break
+    fi
+  done
+  if [ "$valid" -eq 0 ]; then
+    printf >&2 '%s: %s: invalid value for --by\n' "$argv0" "$by"
+    exit 1
+  fi
+done
+
+{
+  for by in "${by_fields[@]}"; do
+    url="https://aur.archlinux.org/rpc/v5/search/$keyword?by=$by"
+    curl "${curl_args[@]}" "$url" | jq -rc ".results[] | $jq_query"
+  done
+} | sort | uniq

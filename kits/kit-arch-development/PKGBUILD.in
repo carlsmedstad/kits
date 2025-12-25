@@ -11,7 +11,9 @@ depends=(
   archlinux-contrib
   archlinux-repro
   base-devel
+  curl
   devtools
+  jq
   namcap
   nvchecker
   pkgstats
@@ -23,6 +25,7 @@ sha256sums=('SKIP')
 
 package() {
   cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-aur-search
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-diff
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-ls
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-nvcheck
