@@ -22,8 +22,8 @@ archive=${1:?}
 archive_root=$(dirname "$archive")
 archive_name=$(basename "$archive")
 
-[ -d "$archive_name.orig" ] || {
-  printf >&2 '%s: %s: does not exist\n' "$argv0" "$archive_name.orig"
+[ -d "$archive_root/$archive_name.orig" ] || {
+  printf >&2 '%s: %s: does not exist\n' "$argv0" "$archive_root/$archive_name.orig"
   exit 1
 }
 
