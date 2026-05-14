@@ -1,0 +1,59 @@
+#!/bin/bash
+# Render /etc/crypttab.initramfs from the active LUKS2 mapping using the
+# template at /usr/lib/kit-base-system/crypttab.initramfs.in. Always
+# overwrites the target so kit updates to the template take effect on
+# package upgrade. Skips only if zero or multiple LUKS2 mappings are
+# active (ambiguous source).
+
+set -euo pipefail
+
+argv0=render-crypttab-initramfs
+target=/etc/crypttab.initramfs
+template=/usr/lib/kit-base-system/crypttab.initramfs.in
+
+log() {
+  local fmt=$1
+  shift
+  # shellcheck disable=SC2059
+  printf "%s: $fmt\n" "$argv0" "$@" >&2
+}
+
+mappings=()
+for f in /sys/class/block/dm-*/dm/uuid; do
+  [[ -r $f ]] || continue
+  IFS= read -r entry < "$f"
+  if [[ $entry =~ ^CRYPT-LUKS2-([0-9a-f]+)-(.+)$ ]]; then
+    mappings+=("${BASH_REMATCH[2]}:${BASH_REMATCH[1]}")
+  fi
+done
+
+case ${#mappings[@]} in
+0)
+  log 'no active LUKS2 mapping found, skipping %s' "$target"
+  exit 0
+  ;;
+1) ;;
+*)
+  log 'multiple LUKS2 mappings active, cannot auto-pick:'
+  printf '  %s\n' "${mappings[@]}" >&2
+  log 'create %s manually' "$target"
+  exit 0
+  ;;
+esac
+
+name=${mappings[0]%%:*}
+uuid_raw=${mappings[0]##*:}
+uuid=${uuid_raw:0:8}-${uuid_raw:8:4}-${uuid_raw:12:4}-${uuid_raw:16:4}-${uuid_raw:20:12}
+
+verb=wrote
+[[ -e $target ]] && verb=overwrote
+
+umask 077
+sed \
+  -e "s|%NAME%|${name}|g" \
+  -e "s|%UUID%|${uuid}|g" \
+  "$template" > "$target"
+chmod 600 "$target"
+
+log '%s %s for mapping=%s uuid=%s' "$verb" "$target" "$name" "$uuid"
+log 'run mkinitcpio -P and reboot to apply'

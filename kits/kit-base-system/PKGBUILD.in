@@ -15,6 +15,7 @@ depends=(
 )
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
+install=$pkgname.install
 
 package() {
   cd $pkgname-$pkgver
@@ -22,6 +23,8 @@ package() {
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
+  install -vDm644 -t "$pkgdir/usr/lib/$pkgname" files/crypttab.initramfs.in
+  install -vDm755 -t "$pkgdir/usr/lib/$pkgname" files/render-crypttab-initramfs
 
   install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }
