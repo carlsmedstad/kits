@@ -1,0 +1,3 @@
+# Rendered to /etc/crypttab.initramfs by
+# /usr/lib/kit-base-system/render-crypttab-initramfs.
+%NAME% UUID=%UUID% none luks,discard,no-read-workqueue,no-write-workqueue

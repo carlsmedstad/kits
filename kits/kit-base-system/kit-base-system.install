@@ -1,0 +1,9 @@
+# shellcheck shell=bash
+
+post_install() {
+  /usr/lib/kit-base-system/render-crypttab-initramfs
+}
+
+post_upgrade() {
+  /usr/lib/kit-base-system/render-crypttab-initramfs
+}

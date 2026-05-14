@@ -1,3 +1,5 @@
+include .mkincl/init.mk
+
 KITS = $(notdir $(shell find kits -mindepth 1 -maxdepth 1 -type d))
 
 .PHONY: $(addprefix package-signed-,$(KITS))
