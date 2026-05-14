@@ -18,6 +18,7 @@ sha256sums=('SKIP')
 
 package() {
   cd $pkgname-$pkgver
+  install -vDm644 -t "$pkgdir/etc/mkinitcpio.conf.d" files/10-sd-encrypt.conf
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
