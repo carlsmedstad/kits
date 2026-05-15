@@ -1,0 +1,73 @@
+#!/bin/bash
+# Render /etc/fstab from the active filesystem layout using the template at
+# /usr/lib/kit-base-system/fstab.in. Discovers UUIDs for the LUKS+LVM layout
+# this kit assumes: VolGroup with root/home/swap LVs and a vfat ESP at /boot.
+# Always overwrites the target so template changes propagate on package
+# upgrade. Skips only if any expected source is missing (ambiguous host).
+
+set -euo pipefail
+
+argv0=render-fstab
+target=/etc/fstab
+template=/usr/lib/kit-base-system/fstab.in
+
+log() {
+  local fmt=$1
+  shift
+  # shellcheck disable=SC2059
+  printf "%s: $fmt\n" "$argv0" "$@" >&2
+}
+
+declare -A uuid
+uuid[ROOT]=$(lsblk -no UUID /dev/mapper/VolGroup-root 2>/dev/null || true)
+uuid[HOME]=$(lsblk -no UUID /dev/mapper/VolGroup-home 2>/dev/null || true)
+uuid[SWAP]=$(lsblk -no UUID /dev/mapper/VolGroup-swap 2>/dev/null || true)
+uuid[BOOT]=$(findmnt -no UUID /boot 2>/dev/null || true)
+
+missing=()
+for k in ROOT HOME SWAP BOOT; do
+  [[ -n ${uuid[$k]:-} ]] || missing+=("$k")
+done
+
+if (( ${#missing[@]} > 0 )); then
+  log 'cannot discover UUID for: %s' "${missing[*]}"
+  log 'leaving %s untouched' "$target"
+  exit 0
+fi
+
+tmp=$(mktemp /etc/fstab.XXXXXX)
+trap 'rm -f "$tmp"' EXIT
+
+sed \
+  -e "s|%ROOT_UUID%|${uuid[ROOT]}|g" \
+  -e "s|%HOME_UUID%|${uuid[HOME]}|g" \
+  -e "s|%BOOT_UUID%|${uuid[BOOT]}|g" \
+  -e "s|%SWAP_UUID%|${uuid[SWAP]}|g" \
+  "$template" > "$tmp"
+
+if grep -q '%[A-Z_]*%' "$tmp"; then
+  log 'unsubstituted placeholders remain in rendered fstab, refusing to write'
+  exit 1
+fi
+
+if ! findmnt --verify --tab-file "$tmp" >/dev/null; then
+  log 'findmnt --verify rejected the rendered fstab, refusing to write'
+  findmnt --verify --tab-file "$tmp" >&2 || true
+  exit 1
+fi
+
+verb=wrote
+[[ -e $target ]] && verb=overwrote
+
+chmod 644 "$tmp"
+mv -f "$tmp" "$target"
+trap - EXIT
+
+# Bake data=writeback into the home ext4 superblock as the default mount
+# option, so the preference survives if fstab is ever mis-edited or the
+# filesystem is mounted from a recovery shell.
+tune2fs -o +journal_data_writeback /dev/mapper/VolGroup-home >/dev/null
+
+log '%s %s' "$verb" "$target"
+log 'lazytime takes effect after: sudo mount -o remount /home /'
+log 'data=writeback takes effect at next boot (or full umount+mount cycle)'

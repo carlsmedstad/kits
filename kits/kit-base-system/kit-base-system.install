@@ -2,6 +2,7 @@
 
 post_install() {
   /usr/lib/kit-base-system/render-crypttab-initramfs
+  /usr/lib/kit-base-system/render-fstab
 
   echo "To enable systemd-oomd, run:"
   echo ""
@@ -17,4 +18,5 @@ post_install() {
 
 post_upgrade() {
   /usr/lib/kit-base-system/render-crypttab-initramfs
+  /usr/lib/kit-base-system/render-fstab
 }
