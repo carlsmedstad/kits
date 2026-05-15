@@ -1,0 +1,14 @@
+# Rendered to /etc/fstab by /usr/lib/kit-base-system/render-fstab.
+# See fstab(5) for details.
+
+# /dev/mapper/VolGroup-root
+UUID=%ROOT_UUID%	/         	ext4      	rw,relatime,lazytime	0 1
+
+# /dev/mapper/VolGroup-home
+UUID=%HOME_UUID%	/home     	ext4      	rw,relatime,lazytime,data=writeback	0 2
+
+# ESP (typically /dev/nvme0n1p1)
+UUID=%BOOT_UUID%	/boot     	vfat      	rw,relatime,fmask=0177,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
+
+# /dev/mapper/VolGroup-swap
+UUID=%SWAP_UUID%	none      	swap      	defaults	0 0
