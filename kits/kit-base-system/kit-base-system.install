@@ -2,6 +2,17 @@
 
 post_install() {
   /usr/lib/kit-base-system/render-crypttab-initramfs
+
+  echo "To enable systemd-oomd, run:"
+  echo ""
+  echo "  sudo systemctl daemon-reload"
+  echo "  sudo systemctl enable --now systemd-oomd.service"
+  echo ""
+  echo "To activate zram swap without rebooting, run:"
+  echo ""
+  echo "  sudo systemctl daemon-reload"
+  echo "  sudo systemctl start systemd-zram-setup@zram0.service"
+  echo "  sudo sysctl --system"
 }
 
 post_upgrade() {

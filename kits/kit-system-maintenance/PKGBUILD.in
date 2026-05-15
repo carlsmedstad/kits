@@ -17,6 +17,7 @@ sha256sums=('SKIP')
 package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
+  install -vDm644 -t "$pkgdir/etc/tlp.d" files/15-cpu-perf-on-ac.conf
 
   install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 }
