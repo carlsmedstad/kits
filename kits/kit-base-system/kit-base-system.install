@@ -7,6 +7,12 @@ post_install() {
   echo ""
   echo "  sudo systemctl daemon-reload"
   echo "  sudo systemctl enable --now systemd-oomd.service"
+  echo ""
+  echo "To activate zram swap without rebooting, run:"
+  echo ""
+  echo "  sudo systemctl daemon-reload"
+  echo "  sudo systemctl start systemd-zram-setup@zram0.service"
+  echo "  sudo sysctl --system"
 }
 
 post_upgrade() {

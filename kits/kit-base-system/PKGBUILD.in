@@ -12,6 +12,7 @@ depends=(
   linux-firmware
   lvm2
   sudo
+  zram-generator
 )
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
@@ -23,6 +24,10 @@ package() {
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
+  install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-zram.conf
+  install -vDm644 -t "$pkgdir/etc/systemd" files/zram-generator.conf
+  install -vDm644 files/modules-load-zram.conf \
+    "$pkgdir/etc/modules-load.d/zram.conf"
   install -vDm644 files/oomd-root-slice.conf \
     "$pkgdir/etc/systemd/system/-.slice.d/99-oomd.conf"
   install -vDm644 files/oomd-user-service.conf \
