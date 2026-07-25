@@ -34,6 +34,14 @@ while IFS='= ' read -r key value; do
   }
 
   case "$section" in
+  pass-init)
+    store_path=$(pass config mounts.path 2>/dev/null || true)
+    store_path=${store_path:-"$HOME/.local/share/gopass/stores/root"}
+
+    if [[ ! -f "$store_path/.gpg-id" ]]; then
+      pass init "$value"
+    fi
+    ;;
   pass)
     password=$(bw get password "$key")
     pass insert --multiline --force "$value" <<< "$password"
