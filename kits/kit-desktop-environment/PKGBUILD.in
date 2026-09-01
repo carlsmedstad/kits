@@ -13,7 +13,6 @@ depends=(
   brightnessctl
   firefox
   fwupd
-  gopass
   greetd
   grim
   handlr-regex

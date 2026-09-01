@@ -20,6 +20,7 @@ package() {
   install -vDm755 -t "$pkgdir/usr/bin" files/bw-sync
 
   install -vDm644 files/pinentry-preexec.sh "$pkgdir/etc/pinentry/preexec"
+  install -vDm644 files/sway.conf "$pkgdir/etc/sway/config.d/60-kit-secrets.conf"
 
   # Shadow ssh and update startup TTY before running.
   install -vDm755 -t "$pkgdir/usr/local/bin" files/ssh
