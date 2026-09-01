@@ -3,7 +3,9 @@
 # template at /usr/lib/kit-base-system/crypttab.initramfs.in. Always
 # overwrites the target so kit updates to the template take effect on
 # package upgrade. Skips only if zero or multiple LUKS2 mappings are
-# active (ambiguous source).
+# active (ambiguous source). Warns if the mapping uses 512 byte sectors, as
+# every write then goes through read-modify-write on 4K disks. The sector
+# size is set by luksFormat --sector-size and cannot be changed later.
 
 set -euo pipefail
 
@@ -23,7 +25,7 @@ for f in /sys/class/block/dm-*/dm/uuid; do
   [[ -r $f ]] || continue
   IFS= read -r entry < "$f"
   if [[ $entry =~ ^CRYPT-LUKS2-([0-9a-f]+)-(.+)$ ]]; then
-    mappings+=("${BASH_REMATCH[2]}:${BASH_REMATCH[1]}")
+    mappings+=("${BASH_REMATCH[2]}:${BASH_REMATCH[1]}:${f%/dm/uuid}")
   fi
 done
 
@@ -41,8 +43,7 @@ case ${#mappings[@]} in
   ;;
 esac
 
-name=${mappings[0]%%:*}
-uuid_raw=${mappings[0]##*:}
+IFS=: read -r name uuid_raw sysdir <<< "${mappings[0]}"
 uuid=${uuid_raw:0:8}-${uuid_raw:8:4}-${uuid_raw:12:4}-${uuid_raw:16:4}-${uuid_raw:20:12}
 
 verb=wrote
@@ -57,3 +58,9 @@ chmod 600 "$target"
 
 log '%s %s for mapping=%s uuid=%s' "$verb" "$target" "$name" "$uuid"
 log 'run mkinitcpio -P and reboot to apply'
+
+sector_size=$(< "$sysdir/queue/logical_block_size")
+if [[ $sector_size != 4096 ]]; then
+  log 'WARNING: mapping %s uses %s byte sectors, expected 4096' "$name" "$sector_size"
+  log 'WARNING: reformat with cryptsetup luksFormat --sector-size 4096 at next reinstall'
+fi
