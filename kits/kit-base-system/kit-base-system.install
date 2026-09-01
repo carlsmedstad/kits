@@ -10,8 +10,8 @@ post_install() {
     ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
   fi
 
-  echo "Services are enabled by preset on first boot. On an existing system,"
-  echo "apply the preset and reboot:"
+  echo "Services are enabled by preset when installed with kit-install. On an"
+  echo "existing system, apply the preset and reboot:"
   echo ""
   echo "  sudo systemctl preset fstrim.timer iwd systemd-networkd \\"
   echo "    systemd-oomd systemd-resolved systemd-timesyncd tlp"

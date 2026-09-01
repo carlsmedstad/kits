@@ -1,8 +1,8 @@
 # shellcheck shell=bash
 
 post_install() {
-  echo "greetd is enabled by preset on first boot. On an existing system, apply"
-  echo "the preset and reboot:"
+  echo "greetd is enabled by preset when installed with kit-install. On an"
+  echo "existing system, apply the preset and reboot:"
   echo ""
   echo "  sudo systemctl preset greetd"
 }
