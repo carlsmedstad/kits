@@ -11,7 +11,6 @@ depends=(
   archlinux-contrib
   archlinux-repro
   base-devel
-  curl
   devtools
   jq
   namcap
