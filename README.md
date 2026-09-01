@@ -74,8 +74,7 @@ Kits installing applications:
 - **kit-editor:** Installs the editor [Neovim][] along with some helper
   scripts.
 
-- **kit-mail:** Installs the mail client [aerc][] and [Proton Mail Bridge][] to
-  be able to connect to use [Proton Mail][].
+- **kit-mail:** Installs the mail client [aerc][].
 
 Kits installing utilities:
 
@@ -92,8 +91,6 @@ Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 [Alacritty]: https://alacritty.org/
 [Neovim]: https://neovim.io/
 [aerc]: https://aerc-mail.org/
-[Proton Mail]: https://proton.me/mail
-[Proton Mail Bridge]: https://github.com/ProtonMail/proton-bridge
 [Bitwarden]: https://bitwarden.com/
 [Catppuccin]: https://catppuccin.com/
 
