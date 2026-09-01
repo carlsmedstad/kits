@@ -41,6 +41,7 @@ depends=(
   xdg-user-dirs
   xorg-xwayland
 )
+install=$pkgname.install
 _catppuccin_i3_ver=c072ada05271eec960dc893affe9ac55af63a745
 _catppuccin_alacritty_ver=f6cb5a5c2b404cdaceaff193b9c52317f62c62f7
 source=(
@@ -90,6 +91,9 @@ package() {
     "$pkgdir/usr/share/i3status-rust/themes/ctp-mocha-dark.toml"
 
   install -vDm644 files/alacritty.toml "$pkgdir/etc/alacritty/alacritty.toml"
+
+  install -vDm644 files/kit-desktop-environment.preset \
+    "$pkgdir/usr/lib/systemd/system-preset/50-kit-desktop-environment.preset"
 
   install -vDm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-kit"
   install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE-unsplash
