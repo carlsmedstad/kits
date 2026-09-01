@@ -6,16 +6,19 @@ arch=('any')
 url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
+  direnv
   fd
   fish
   fisher
   fzf
   ghq
   git
+  github-cli
   man-db
   openssh
   pkgfile
   ripgrep
+  zoxide
 )
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
