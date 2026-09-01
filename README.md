@@ -59,10 +59,13 @@ More generic kits:
   [Sway][], with login manager, launcher, bar, notifications, fonts, browser
   and theme. Comes with the terminal emulator [Alacritty][].
 
+- **kit-installer:** Installs Arch Linux with kits from the live ISO, see
+  [docs/installation.md](docs/installation.md).
+
 After installing the kits above and following the post-install instructions,
 you should end up with a desktop environment looking like this:
 
-![Screenshot](doc/screenshot.png)
+![Screenshot](docs/screenshot.png)
 
 Note the small number of explicitly installed packages.
 
@@ -94,6 +97,11 @@ Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
 ## Installation
 
+### Install a system with kit-installer
+
+To install Arch Linux with kits from the live ISO, see
+[docs/installation.md](docs/installation.md).
+
 ### Install pre-built kits with pacman
 
 To install pre-built packages from the custom repository at
@@ -110,6 +118,11 @@ And install the kits as you would any other package:
 ```sh
 sudo pacman -Syu <kit>
 ```
+
+### Test kits in a virtual machine
+
+To try the installer and the kits in QEMU before touching real hardware, see
+[docs/testing.md](docs/testing.md).
 
 ### Build kits from source with makepkg
 

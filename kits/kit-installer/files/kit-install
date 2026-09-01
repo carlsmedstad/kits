@@ -1,0 +1,284 @@
+#!/bin/bash
+# Install Arch Linux with kits onto a disk, from the live ISO. Creates the
+# layout kit-base-system expects: GPT with an EFI system partition and a
+# LUKS2 partition with 4K sectors holding LVM volume group VolGroup with
+# swap, root and home. Every check fails loudly rather than half-installing.
+
+set -euo pipefail
+
+argv0=kit-install
+target=/mnt
+
+disk=
+hostname=
+user=
+kits=(kit-base-system kit-desktop-environment)
+esp_size=1G
+root_size=64G
+swap_size=
+locale=en_US.UTF-8
+keymap=us
+timezone=UTC
+force=0
+only_disks=0
+skip_disks=0
+
+usage() {
+  cat >&2 << USAGE
+usage: $argv0 [options] --hostname NAME DISK
+
+Installs Arch Linux with kits onto DISK, wiping it. Run from the Arch ISO
+with the [kits] repository added to /etc/pacman.conf.
+
+options:
+  --hostname NAME   hostname of the installed system (required)
+  --user NAME       create this user in group wheel, with fish if installed
+  --kits "A B"      kits to install (default: ${kits[*]})
+  --esp-size SIZE   EFI system partition size (default: $esp_size)
+  --root-size SIZE  root LV size (default: $root_size)
+  --swap-size SIZE  swap LV size (default: RAM size, allows hibernation)
+  --locale LOCALE   (default: $locale)
+  --keymap KEYMAP   (default: $keymap)
+  --timezone TZ     (default: $timezone)
+  --force           wipe DISK even if it has existing signatures
+  --only-disks      stop after partitioning, formatting and mounting
+  --skip-disks      assume $target is set up, only install the system
+USAGE
+}
+
+log() {
+  printf '%s: %s\n' "$argv0" "$*" >&2
+}
+
+die() {
+  log "$@"
+  exit 1
+}
+
+while (($#)); do
+  case $1 in
+  --hostname)
+    hostname=$2
+    shift
+    ;;
+  --user)
+    user=$2
+    shift
+    ;;
+  --kits)
+    read -ra kits <<< "$2"
+    shift
+    ;;
+  --esp-size)
+    esp_size=$2
+    shift
+    ;;
+  --root-size)
+    root_size=$2
+    shift
+    ;;
+  --swap-size)
+    swap_size=$2
+    shift
+    ;;
+  --locale)
+    locale=$2
+    shift
+    ;;
+  --keymap)
+    keymap=$2
+    shift
+    ;;
+  --timezone)
+    timezone=$2
+    shift
+    ;;
+  --force) force=1 ;;
+  --only-disks) only_disks=1 ;;
+  --skip-disks) skip_disks=1 ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    usage
+    die "unknown option: $1"
+    ;;
+  *)
+    [[ -z $disk ]] || {
+      usage
+      die "unexpected argument: $1"
+    }
+    disk=$1
+    ;;
+  esac
+  shift
+done
+
+[[ -n $hostname ]] || {
+  usage
+  die "--hostname is required"
+}
+if ((skip_disks)); then
+  [[ -z $disk ]] || die "DISK and --skip-disks are mutually exclusive"
+else
+  [[ -n $disk ]] || {
+    usage
+    die "DISK is required"
+  }
+fi
+((only_disks && skip_disks)) && die "--only-disks and --skip-disks are mutually exclusive"
+
+# Validate everything up front, so a typo fails before the disk is touched.
+[[ $hostname =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
+  || die "$hostname: invalid hostname, use lowercase letters, digits and dashes"
+[[ -z $user || $user =~ ^[a-z_][a-z0-9_-]*$ ]] \
+  || die "$user: invalid user name"
+for size in "$esp_size" "$root_size" "$swap_size"; do
+  [[ -z $size || $size =~ ^[0-9]+[MGT]$ ]] \
+    || die "$size: invalid size, use e.g. 512M or 64G"
+done
+grep -q "^$locale " /usr/share/i18n/SUPPORTED \
+  || die "$locale: unknown locale, see /usr/share/i18n/SUPPORTED"
+[[ -n $(find /usr/share/kbd/keymaps -name "$keymap.map.gz" -print -quit) ]] \
+  || die "$keymap: unknown keymap, see localectl list-keymaps"
+[[ -f /usr/share/zoneinfo/$timezone ]] \
+  || die "$timezone: unknown timezone, see timedatectl list-timezones"
+pacman -Si "${kits[@]}" > /dev/null \
+  || die "unknown kit, is the [kits] repository in /etc/pacman.conf and synced?"
+
+[[ $EUID -eq 0 ]] || die "must run as root"
+[[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode"
+
+if [[ -z $swap_size ]]; then
+  mem_kib=$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)
+  swap_size=$(((mem_kib + 1048575) / 1048576))G
+fi
+
+# Partition device names: nvme0n1 -> nvme0n1p1, sda -> sda1.
+partition() {
+  local n=$1
+  [[ $disk == *[0-9] ]] && echo "${disk}p$n" || echo "$disk$n"
+}
+
+disks_stage() {
+  local esp luks signatures answer passphrase confirm
+  [[ -b $disk ]] || die "$disk: not a block device"
+  if lsblk -no MOUNTPOINTS "$disk" | grep -q .; then
+    log "$disk: has mounted filesystems, to start over from a previous run:"
+    log "  umount -R $target; swapoff -a; vgchange -an VolGroup; cryptsetup close cryptlvm"
+    exit 1
+  fi
+
+  signatures=$(wipefs --noheadings "$disk")
+  if [[ -n $signatures ]] && ((!force)); then
+    log "$disk has existing signatures:"
+    printf '  %s\n' "$signatures" >&2
+    die "refusing to wipe, pass --force to override"
+  fi
+
+  esp=$(partition 1)
+  luks=$(partition 2)
+  cat >&2 << PLAN
+About to wipe $disk and create:
+  $esp  $esp_size  EFI system partition, vfat, mounted at /boot
+  $luks  rest  LUKS2 with 4K sectors, LVM VolGroup:
+    swap  $swap_size
+    root  $root_size  ext4, mounted at /
+    home  rest  ext4, mounted at /home
+PLAN
+  read -rp "Type the disk path to continue: " answer
+  [[ $answer == "$disk" ]] || die "aborted"
+
+  read -rsp "LUKS passphrase: " passphrase
+  echo
+  read -rsp "Confirm passphrase: " confirm
+  echo
+  [[ $passphrase == "$confirm" ]] || die "passphrases do not match"
+
+  # sfdisk aligns partitions to MiB, which the 4K LUKS sectors below need.
+  sfdisk --wipe always --wipe-partitions always "$disk" << LAYOUT
+label: gpt
+size=$esp_size, type=uefi, name=ESP
+type=CA7D7CCB-63ED-4C53-861C-1742536059CC, name=cryptlvm
+LAYOUT
+  udevadm settle
+  [[ -b $esp && -b $luks ]] || die "partitions did not appear: $esp $luks"
+
+  # 4K sectors avoid read-modify-write on 4K disks. The sector size is fixed
+  # at format time, so verify it before building anything on top.
+  printf '%s' "$passphrase" \
+    | cryptsetup luksFormat --batch-mode --type luks2 --sector-size 4096 \
+      --key-file - "$luks"
+  if ! cryptsetup luksDump "$luks" | grep -Eq '^[[:space:]]*sector:[[:space:]]*4096'; then
+    cryptsetup luksDump "$luks" >&2
+    die "$luks: LUKS sector size is not 4096"
+  fi
+  printf '%s' "$passphrase" | cryptsetup open --key-file - "$luks" cryptlvm
+
+  pvcreate /dev/mapper/cryptlvm
+  vgcreate VolGroup /dev/mapper/cryptlvm
+  lvcreate --yes -L "$swap_size" -n swap VolGroup
+  lvcreate --yes -L "$root_size" -n root VolGroup
+  lvcreate --yes -l 100%FREE -n home VolGroup
+  # Leave room in the VG for e2scrub snapshots.
+  lvreduce --yes -L -256M VolGroup/home
+
+  mkfs.fat -F32 -n ESP "$esp"
+  mkfs.ext4 -q /dev/VolGroup/root
+  mkfs.ext4 -q /dev/VolGroup/home
+  mkswap /dev/VolGroup/swap
+
+  mount /dev/VolGroup/root "$target"
+  mount --mkdir /dev/VolGroup/home "$target/home"
+  mount --mkdir "$esp" "$target/boot"
+  swapon /dev/VolGroup/swap
+  log "disks ready, mounted under $target"
+}
+
+system_stage() {
+  local shell=/bin/bash
+  mountpoint -q "$target" || die "$target is not mounted"
+  mountpoint -q "$target/boot" || die "$target/boot is not mounted"
+  grep -q '^\[kits\]' /etc/pacman.conf \
+    || die "[kits] repository missing from /etc/pacman.conf"
+
+  pacstrap -K "$target" "${kits[@]}"
+
+  # Carry the [kits] repository over so the installed system can upgrade.
+  if ! grep -q '^\[kits\]' "$target/etc/pacman.conf"; then
+    {
+      echo
+      sed -n '/^\[kits\]/,/^\[/{/^\[kits\]/p;/^\(Server\|Include\|SigLevel\)/p}' \
+        /etc/pacman.conf
+    } >> "$target/etc/pacman.conf"
+  fi
+
+  systemd-firstboot --root="$target" \
+    --locale="$locale" --keymap="$keymap" --timezone="$timezone" \
+    --hostname="$hostname"
+  sed -i "s/^#$locale/$locale/" "$target/etc/locale.gen"
+  arch-chroot "$target" locale-gen
+
+  # pacstrap writes /etc/machine-id, so systemd will not treat the first
+  # boot as one and never applies presets itself. Apply them here.
+  systemctl --root="$target" preset-all
+
+  log "set the root password"
+  arch-chroot "$target" passwd
+  if [[ -n $user ]]; then
+    [[ -x $target/usr/bin/fish ]] && shell=/usr/bin/fish
+    arch-chroot "$target" useradd -m -G wheel -s "$shell" "$user"
+    log "set the password for $user"
+    arch-chroot "$target" passwd "$user"
+  fi
+
+  # The loader configuration and entries come from kit-base-system, bootctl
+  # only installs the EFI binary and the NVRAM entry.
+  arch-chroot "$target" bootctl install
+
+  log "done, reboot into the new system"
+}
+
+((skip_disks)) || disks_stage
+((only_disks)) || system_stage

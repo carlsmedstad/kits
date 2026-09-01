@@ -1,0 +1,26 @@
+pkgname=kit-installer
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Kit installing Arch Linux with kits from the live ISO"
+arch=('any')
+url="https://github.com/carlsmedstad/kits"
+license=('MIT')
+depends=(
+  arch-install-scripts
+  cryptsetup
+  dosfstools
+  e2fsprogs
+  lvm2
+  systemd
+  util-linux
+)
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd $pkgname-$pkgver
+  install -vDm755 -t "$pkgdir/usr/bin" files/kit-install
+  install -vDm644 -t "$pkgdir/usr/share/doc/$pkgname" files/installation.md
+
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}

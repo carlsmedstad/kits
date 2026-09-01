@@ -46,24 +46,34 @@ gh-pages-checkout-branch:
 PKGVER = $(shell git describe --abbrev=7 | sed 's/\([^-]*-g\)/r\1/;s/-/./g')
 PKGFILES = $(foreach kit,$(KITS),kits/$(kit)/$(kit)-$(PKGVER)-1-any.pkg.tar.zst)
 
+# Directory holding the package repository. Defaults to the gh-pages worktree,
+# set to e.g. repo for a local repository to test unpublished kits.
+REPODIR ?= gh-pages
+
+.PHONY: stage-packages
+stage-packages: $(PKGFILES)
+	rm -vf $(REPODIR)/*.pkg.tar.zst $(REPODIR)/*.pkg.tar.zst.sig || true
+	install -vDm644 -t $(REPODIR) $^ $(addsuffix .sig,$^)
+	repo-add $(REPO_ADD_ARGS) $(REPODIR)/$(REPONAME).db.tar.gz $^
+	./mk/gen-index-html $(REPODIR) > $(REPODIR)/index.html
+
 .PHONY: gh-pages-stage-packages
-gh-pages-stage-packages: $(PKGFILES)
-	rm -vf ./gh-pages/*.pkg.tar.zst ./gh-pages/*.pkg.tar.zst.sig || true
-	install -vDm644 -t gh-pages $^ $(addsuffix .sig,$^)
-	repo-add $(REPO_ADD_ARGS) gh-pages/$(REPONAME).db.tar.gz $^
-	./mk/gen-index-html gh-pages > gh-pages/index.html
+gh-pages-stage-packages: stage-packages
 	git -C gh-pages add '*'
 	git -C gh-pages commit -m "upgpkg: $(PKGVER)"
 
 # Packages in the repo database that no longer have a kit in this repository.
 STALEPKGS = $(filter-out $(KITS),$(shell \
-	tar tf gh-pages/$(REPONAME).db.tar.gz | sed 's|/.*||;s/-[^-]*-[^-]*$$//' | sort -u))
+	tar tf $(REPODIR)/$(REPONAME).db.tar.gz | sed 's|/.*||;s/-[^-]*-[^-]*$$//' | sort -u))
+
+.PHONY: prune-packages
+prune-packages:
+	$(if $(STALEPKGS),repo-remove --sign --key $(GPGKEY) --remove \
+		$(REPODIR)/$(REPONAME).db.tar.gz $(STALEPKGS))
+	./mk/gen-index-html $(REPODIR) > $(REPODIR)/index.html
 
 .PHONY: gh-pages-prune-packages
-gh-pages-prune-packages:
-	$(if $(STALEPKGS),repo-remove --sign --key $(GPGKEY) --remove \
-		gh-pages/$(REPONAME).db.tar.gz $(STALEPKGS))
-	./mk/gen-index-html gh-pages > gh-pages/index.html
+gh-pages-prune-packages: prune-packages
 	git -C gh-pages add '*'
 	git -C gh-pages diff --quiet --cached || \
 		git -C gh-pages commit -m "Prune packages: $(STALEPKGS)"
