@@ -6,7 +6,9 @@ arch=('any')
 url="https://github.com/carlsmedstad/kits"
 license=('MIT')
 depends=(
+  amd-ucode
   base
+  intel-ucode
   iwd
   linux
   linux-firmware
