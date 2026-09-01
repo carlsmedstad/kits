@@ -9,6 +9,8 @@ depends=(
   neovim
   gcc             # required for compiling tree-sitter grammars
   tree-sitter-cli # required for compiling tree-sitter grammars
+  shellcheck      # ALE linter for shell scripts
+  shfmt           # ALE fixer for shell scripts
 )
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')

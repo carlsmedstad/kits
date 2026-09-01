@@ -28,7 +28,7 @@ Some nice things about kits:
   fulfil a use-case.
 
   Using the desktop environment as example again, just installing Sway does not
-  get you very far - the `kit-desktop-environment` package depends on 26
+  get you very far - the `kit-desktop-environment` package depends on 34
   packages and should work out-of-the-box as it installs all the necessary
   dependencies and a corresponding configuration.
 
@@ -46,21 +46,18 @@ Some nice things about kits:
 
 ## Kits in this repository
 
-Note that categorization is hard, so these categories/kits are very much a work
-in progress. My initial goal has been apply the kit-concept on my system and
-use-cases, not to produce something that is generic and easily reusable. I am
-however interested in exploring that path, long-term.
+The kits are grouped by how generic they are. The first group should be usable
+by anyone who wants Arch Linux with Sway, the second is shaped by the tools I
+happen to use.
 
-Kits installing fundamental stuff:
+More generic kits:
 
-- **kit-base-system:** Installs e.g. the kernel and other fundamental stuff.
+- **kit-base-system:** Installs what is needed to boot the machine: the kernel,
+  microcode, networking, encrypted LVM, zram swap and power management.
 
-- **kit-shell-environment:** Installs my shell of choice, [fish][], along with
-  some programs that are key to the command-line, such as Git and OpenSSH.
-
-- **kit-desktop-environment:** Installs a desktop environment, [Sway][]. Fully
-  featured with login manager, launcher, bar, theme, and so on. Comes with the
-  terminal emulator [Alacritty][].
+- **kit-desktop-environment:** Installs a fully featured desktop environment,
+  [Sway][], with login manager, launcher, bar, notifications, fonts, browser
+  and theme. Comes with the terminal emulator [Alacritty][].
 
 After installing the kits above and following the post-install instructions,
 you should end up with a desktop environment looking like this:
@@ -69,29 +66,21 @@ you should end up with a desktop environment looking like this:
 
 Note the small number of explicitly installed packages.
 
-Kits installing applications:
+More bespoke kits:
 
-- **kit-editor:** Installs the editor [Neovim][] along with some helper
-  scripts.
+- **kit-shell-environment:** Installs my shell of choice, [fish][], along with
+  the command-line tools I use, such as Git, OpenSSH, ripgrep and direnv.
 
-- **kit-mail:** Installs the mail client [aerc][] and [Proton Mail Bridge][] to
-  be able to connect to use [Proton Mail][].
-
-Kits installing utilities:
+- **kit-editor:** Installs my editor, [Neovim][], along with the tools its
+  configuration needs and some helper scripts.
 
 - **kit-secrets:** Utilities for managing secrets, using [Bitwarden][] as vault
   with some secrets synced locally to a gopass store.
 
+- **kit-mail:** Installs the mail client [aerc][].
+
 - **kit-arch-development:** Utilities useful for Arch Linux development and
   packaging.
-
-- **kit-arch-user-repository:** Utilities for downloading packages from the
-  [Arch Linux User Repository (AUR)][], specifically [aurutils][].
-
-- **kit-development-utilities:** Generic development utilities (kind of a
-  catch-all).
-
-- **kit-system-maintenance:** Utilities for performing system maintenance.
 
 Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
@@ -100,11 +89,7 @@ Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 [Alacritty]: https://alacritty.org/
 [Neovim]: https://neovim.io/
 [aerc]: https://aerc-mail.org/
-[Proton Mail]: https://proton.me/mail
-[Proton Mail Bridge]: https://github.com/ProtonMail/proton-bridge
 [Bitwarden]: https://bitwarden.com/
-[Arch Linux User Repository (AUR)]: https://aur.archlinux.org/
-[aurutils]: https://github.com/aurutils/aurutils
 [Catppuccin]: https://catppuccin.com/
 
 ## Installation

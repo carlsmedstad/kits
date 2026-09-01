@@ -8,15 +8,21 @@ license=('MIT AND LicenseRef-Unsplash')
 depends=(
   alacritty
   bemenu-wayland
+  bluez
+  bluez-utils
   brightnessctl
-  gopass
+  firefox
+  fwupd
   greetd
   grim
   handlr-regex
   i3status-rust
   j4-dmenu-desktop
   jq
+  libnotify
   mako
+  noto-fonts
+  noto-fonts-emoji
   otf-font-awesome
   pamixer
   pipewire-pulse
@@ -28,6 +34,7 @@ depends=(
   swayidle
   swayimg
   swaylock
+  ttf-nerd-fonts-symbols
   wl-clipboard
   wlsunset
   wob
@@ -67,7 +74,9 @@ package() {
   install -vDm644 files/60-fonts-aliases.conf \
     "$pkgdir/etc/fonts/conf.d/60-fonts-aliases.conf"
 
-  install -vDm644 files/greetd.toml "$pkgdir/etc/greetd/config.toml"
+  install -vDm644 files/greetd.toml "$pkgdir/etc/greetd/kit.toml"
+  install -vDm644 files/greetd-service.conf \
+    "$pkgdir/etc/systemd/system/greetd.service.d/kit.conf"
   install -vDm644 files/sway.conf "$pkgdir/etc/sway/kit.conf"
   install -vDm644 files/evening-sky.png \
     "$pkgdir/usr/share/backgrounds/sway/evening-sky.png"
