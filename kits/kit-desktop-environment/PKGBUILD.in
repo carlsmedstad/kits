@@ -8,7 +8,10 @@ license=('MIT AND LicenseRef-Unsplash')
 depends=(
   alacritty
   bemenu-wayland
+  bluez
+  bluez-utils
   brightnessctl
+  firefox
   fwupd
   gopass
   greetd
@@ -19,6 +22,8 @@ depends=(
   jq
   libnotify
   mako
+  noto-fonts
+  noto-fonts-emoji
   otf-font-awesome
   pamixer
   pipewire-pulse
@@ -26,11 +31,11 @@ depends=(
   shikane
   slurp
   sway
-  ttf-nerd-fonts-symbols
   swaybg
   swayidle
   swayimg
   swaylock
+  ttf-nerd-fonts-symbols
   wl-clipboard
   wlsunset
   wob
