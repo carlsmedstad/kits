@@ -4,11 +4,17 @@ post_install() {
   /usr/lib/kit-base-system/render-crypttab-initramfs
   /usr/lib/kit-base-system/render-fstab
 
+  # Let programs using libc name resolution reach systemd-resolved. Leave an
+  # existing symlink alone, it may be the admin's own choice.
+  if [ ! -L /etc/resolv.conf ]; then
+    ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+  fi
+
   echo "Services are enabled by preset on first boot. On an existing system,"
   echo "apply the preset and reboot:"
   echo ""
-  echo "  sudo systemctl preset iwd systemd-networkd systemd-oomd \\"
-  echo "    systemd-resolved systemd-timesyncd tlp"
+  echo "  sudo systemctl preset fstrim.timer iwd systemd-networkd \\"
+  echo "    systemd-oomd systemd-resolved systemd-timesyncd tlp"
 }
 
 post_upgrade() {

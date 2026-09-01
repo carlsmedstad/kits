@@ -92,6 +92,9 @@ package() {
 
   install -vDm644 files/alacritty.toml "$pkgdir/etc/alacritty/alacritty.toml"
 
+  install -vDm644 files/kit-desktop-environment.preset \
+    "$pkgdir/usr/lib/systemd/system-preset/50-kit-desktop-environment.preset"
+
   install -vDm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-kit"
   install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE-unsplash
 }
