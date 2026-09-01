@@ -26,6 +26,10 @@ package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
 
+  install -vDm644 -t "$pkgdir/boot/loader" files/loader.conf
+  install -vDm644 -t "$pkgdir/boot/loader/entries" files/arch.conf
+  install -vDm644 -t "$pkgdir/boot/loader/entries" files/arch-fallback.conf
+
   install -vDm644 -t "$pkgdir/etc/mkinitcpio.conf.d" files/10-sd-encrypt.conf
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
