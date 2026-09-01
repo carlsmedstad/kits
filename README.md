@@ -91,8 +91,6 @@ Kits installing utilities:
 - **kit-development-utilities:** Generic development utilities (kind of a
   catch-all).
 
-- **kit-system-maintenance:** Utilities for performing system maintenance.
-
 Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
 [fish]: https://fishshell.com/

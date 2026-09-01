@@ -14,6 +14,10 @@ post_install() {
   echo "  sudo systemctl daemon-reload"
   echo "  sudo systemctl start systemd-zram-setup@zram0.service"
   echo "  sudo sysctl --system"
+  echo ""
+  echo "To enable TLP, run:"
+  echo ""
+  echo "  sudo systemctl enable --now tlp"
 }
 
 post_upgrade() {

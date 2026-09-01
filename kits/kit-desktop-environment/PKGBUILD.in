@@ -9,6 +9,7 @@ depends=(
   alacritty
   bemenu-wayland
   brightnessctl
+  fwupd
   gopass
   greetd
   grim
