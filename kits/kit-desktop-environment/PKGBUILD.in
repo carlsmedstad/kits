@@ -17,6 +17,7 @@ depends=(
   i3status-rust
   j4-dmenu-desktop
   jq
+  libnotify
   mako
   otf-font-awesome
   pamixer

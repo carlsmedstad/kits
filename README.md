@@ -88,9 +88,6 @@ Kits installing utilities:
 - **kit-arch-user-repository:** Utilities for downloading packages from the
   [Arch Linux User Repository (AUR)][], specifically [aurutils][].
 
-- **kit-development-utilities:** Generic development utilities (kind of a
-  catch-all).
-
 Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
 [fish]: https://fishshell.com/

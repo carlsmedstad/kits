@@ -10,6 +10,7 @@ depends=(
   fish
   fisher
   fzf
+  ghq
   git
   man-db
   openssh
