@@ -55,6 +55,19 @@ gh-pages-stage-packages: $(PKGFILES)
 	git -C gh-pages add '*'
 	git -C gh-pages commit -m "upgpkg: $(PKGVER)"
 
+# Packages in the repo database that no longer have a kit in this repository.
+STALEPKGS = $(filter-out $(KITS),$(shell \
+	tar tf gh-pages/$(REPONAME).db.tar.gz | sed 's|/.*||;s/-[^-]*-[^-]*$$//' | sort -u))
+
+.PHONY: gh-pages-prune-packages
+gh-pages-prune-packages:
+	$(if $(STALEPKGS),repo-remove --sign --key $(GPGKEY) --remove \
+		gh-pages/$(REPONAME).db.tar.gz $(STALEPKGS))
+	./mk/gen-index-html gh-pages > gh-pages/index.html
+	git -C gh-pages add '*'
+	git -C gh-pages diff --quiet --cached || \
+		git -C gh-pages commit -m "Prune packages: $(STALEPKGS)"
+
 .PHONY: gh-pages-push-packages
 gh-pages-push-packages:
 	git -C gh-pages push origin gh-pages
