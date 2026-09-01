@@ -26,6 +26,7 @@ depends=(
   shikane
   slurp
   sway
+  ttf-nerd-fonts-symbols
   swaybg
   swayidle
   swayimg

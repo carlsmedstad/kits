@@ -85,9 +85,6 @@ Kits installing utilities:
 - **kit-arch-development:** Utilities useful for Arch Linux development and
   packaging.
 
-- **kit-arch-user-repository:** Utilities for downloading packages from the
-  [Arch Linux User Repository (AUR)][], specifically [aurutils][].
-
 Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 
 [fish]: https://fishshell.com/
@@ -98,8 +95,6 @@ Consistent throughout the kits is the theme [Catppuccin][] Mocha.
 [Proton Mail]: https://proton.me/mail
 [Proton Mail Bridge]: https://github.com/ProtonMail/proton-bridge
 [Bitwarden]: https://bitwarden.com/
-[Arch Linux User Repository (AUR)]: https://aur.archlinux.org/
-[aurutils]: https://github.com/aurutils/aurutils
 [Catppuccin]: https://catppuccin.com/
 
 ## Installation
