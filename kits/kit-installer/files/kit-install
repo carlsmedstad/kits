@@ -32,7 +32,7 @@ with the [kits] repository added to /etc/pacman.conf.
 
 options:
   --hostname NAME   hostname of the installed system (required)
-  --user NAME       create this user in group wheel, with fish if installed
+  --user NAME       create this user in group wheel and lock root
   --kits "A B"      kits to install (default: ${kits[*]})
   --esp-size SIZE   EFI system partition size (default: $esp_size)
   --root-size SIZE  root LV size (default: $root_size)
@@ -264,13 +264,16 @@ system_stage() {
   # boot as one and never applies presets itself. Apply them here.
   systemctl --root="$target" preset-all
 
-  log "set the root password"
-  arch-chroot "$target" passwd
   if [[ -n $user ]]; then
     [[ -x $target/usr/bin/fish ]] && shell=/usr/bin/fish
     arch-chroot "$target" useradd -m -G wheel -s "$shell" "$user"
     log "set the password for $user"
     arch-chroot "$target" passwd "$user"
+    # The user has sudo through wheel, root stays locked.
+    arch-chroot "$target" passwd -l root
+  else
+    log "set the root password"
+    arch-chroot "$target" passwd
   fi
 
   # The loader configuration and entries come from kit-base-system, bootctl
