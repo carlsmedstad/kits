@@ -27,10 +27,15 @@ package() {
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
 
   install -vDm644 -t "$pkgdir/boot/loader" files/loader.conf
-  install -vDm644 -t "$pkgdir/boot/loader/entries" files/arch.conf
-  install -vDm644 -t "$pkgdir/boot/loader/entries" files/arch-fallback.conf
+  # mkinitcpio writes the unified kernel images here and does not create it.
+  install -vd "$pkgdir/boot/EFI/Linux"
 
+  install -vDm644 files/cmdline.conf \
+    "$pkgdir/etc/cmdline.d/10-kit-base-system.conf"
   install -vDm644 -t "$pkgdir/etc/mkinitcpio.conf.d" files/10-sd-encrypt.conf
+  install -vDm644 -t "$pkgdir/etc/mkinitcpio.d" files/linux.preset
+  install -vDm644 files/mkinitcpio.hook \
+    "$pkgdir/usr/share/libalpm/hooks/95-kit-base-system-mkinitcpio.hook"
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules

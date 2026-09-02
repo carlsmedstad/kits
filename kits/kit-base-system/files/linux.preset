@@ -1,0 +1,9 @@
+# mkinitcpio preset for the linux package, building a unified kernel image
+# that systemd-boot discovers in /boot/EFI/Linux without loader entries. The
+# kernel command line comes from /etc/cmdline.d.
+
+ALL_kver="/boot/vmlinuz-linux"
+
+PRESETS=('default')
+
+default_uki="/boot/EFI/Linux/arch-linux.efi"

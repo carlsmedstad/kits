@@ -1,0 +1,15 @@
+# The mkinitcpio hook rebuilds on kernel and module changes, not on changes
+# to the preset, hooks or command line, which the unified kernel image bakes
+# in. Rebuild when kit-base-system changes any of them.
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = etc/cmdline.d/*
+Target = etc/mkinitcpio.conf.d/*
+Target = etc/mkinitcpio.d/*
+
+[Action]
+Description = Rebuilding unified kernel images for changed configuration...
+When = PostTransaction
+Exec = /usr/bin/mkinitcpio -P
