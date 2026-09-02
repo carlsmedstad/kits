@@ -41,6 +41,7 @@ package() {
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
   install -vDm440 files/sudoers-wheel "$pkgdir/etc/sudoers.d/kit-wheel"
+  install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-hardening.conf
   install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-zram.conf
   install -vDm644 -t "$pkgdir/etc/tlp.d" files/15-cpu-perf-on-ac.conf
   install -vDm644 files/resolved.conf \
