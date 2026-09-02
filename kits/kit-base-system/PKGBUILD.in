@@ -13,6 +13,7 @@ depends=(
   linux
   linux-firmware
   lvm2
+  nftables
   pacman-contrib
   sudo
   tlp
