@@ -13,7 +13,7 @@ post_install() {
   echo "Services are enabled by preset when installed with kit-install. On an"
   echo "existing system, apply the preset and reboot:"
   echo ""
-  echo "  sudo systemctl preset fstrim.timer iwd systemd-networkd \\"
+  echo "  sudo systemctl preset fstrim.timer iwd nftables systemd-networkd \\"
   echo "    systemd-oomd systemd-resolved systemd-timesyncd tlp"
 }
 

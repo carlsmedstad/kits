@@ -38,9 +38,10 @@ kit-install \
 
 The installer shows the planned layout and asks for the disk path before
 wiping anything. It refuses a disk with existing signatures unless given
-`--force`. It then prompts for the LUKS passphrase, the root password and the
-user's password. See `kit-install --help` for the sizes and settings that can
-be changed.
+`--force`. It then prompts for the LUKS passphrase and the user's password.
+The user has sudo through the wheel group and root is locked. Without
+`--user` it asks for a root password instead. See `kit-install --help` for
+the sizes and settings that can be changed.
 
 Reboot when it says so. The system boots to `greetd`, which starts Sway after
 login.

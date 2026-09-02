@@ -1,5 +1,6 @@
 enable fstrim.timer
 enable iwd.service
+enable nftables.service
 enable systemd-networkd.service
 enable systemd-oomd.service
 enable systemd-resolved.service

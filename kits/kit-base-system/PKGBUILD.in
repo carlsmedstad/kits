@@ -13,6 +13,7 @@ depends=(
   linux
   linux-firmware
   lvm2
+  nftables
   pacman-contrib
   sudo
   tlp
@@ -26,9 +27,10 @@ package() {
   cd $pkgname-$pkgver
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-clean
 
+  # The ESP is mounted with dmask=0077, declare directories to match.
+  install -vdm700 "$pkgdir/boot/EFI" "$pkgdir/boot/EFI/Linux" \
+    "$pkgdir/boot/loader"
   install -vDm644 -t "$pkgdir/boot/loader" files/loader.conf
-  # mkinitcpio writes the unified kernel images here and does not create it.
-  install -vd "$pkgdir/boot/EFI/Linux"
 
   install -vDm644 files/cmdline.conf \
     "$pkgdir/etc/cmdline.d/10-kit-base-system.conf"
@@ -39,9 +41,13 @@ package() {
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
+  install -vdm750 "$pkgdir/etc/sudoers.d"
   install -vDm440 files/sudoers-wheel "$pkgdir/etc/sudoers.d/kit-wheel"
+  install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-hardening.conf
   install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-zram.conf
   install -vDm644 -t "$pkgdir/etc/tlp.d" files/15-cpu-perf-on-ac.conf
+  install -vDm644 files/resolved.conf \
+    "$pkgdir/etc/systemd/resolved.conf.d/10-kit-base-system.conf"
   install -vDm644 -t "$pkgdir/etc/systemd" files/zram-generator.conf
   install -vDm644 files/modules-load-zram.conf \
     "$pkgdir/etc/modules-load.d/zram.conf"
@@ -49,6 +55,10 @@ package() {
     "$pkgdir/etc/systemd/system/-.slice.d/99-oomd.conf"
   install -vDm644 files/oomd-user-service.conf \
     "$pkgdir/etc/systemd/system/user@.service.d/99-oomd.conf"
+  install -vDm644 files/sulogin-force.conf \
+    "$pkgdir/etc/systemd/system/emergency.service.d/kit.conf"
+  install -vDm644 files/sulogin-force.conf \
+    "$pkgdir/etc/systemd/system/rescue.service.d/kit.conf"
   install -vDm644 files/kit-base-system.preset \
     "$pkgdir/usr/lib/systemd/system-preset/50-kit-base-system.preset"
   install -vDm644 -t "$pkgdir/usr/lib/$pkgname" files/crypttab.initramfs.in
