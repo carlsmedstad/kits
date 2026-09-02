@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pacman -Q*)",
+      "Bash(pacman -Si*)",
+      "Bash(pacman -Fl *)",
+      "Bash(tar tf *)",
+      "Bash(tar tvf *)",
+      "Bash(tar xOf *)"
+    ]
+  }
+}
