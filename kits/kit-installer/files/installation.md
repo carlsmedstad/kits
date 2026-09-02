@@ -59,7 +59,8 @@ nvme0n1
 
 This is the [LVM on LUKS][] layout from the wiki. It is fixed rather than
 configurable because `kit-base-system` renders `fstab` and
-`crypttab.initramfs` from it and ships static boot loader entries for it.
+`crypttab.initramfs` from it and embeds the root device in the unified kernel
+image's command line.
 
 The LUKS container is formatted with `--sector-size 4096`. Modern SSDs have 4K
 physical sectors, and with the default 512 byte sectors every write goes
