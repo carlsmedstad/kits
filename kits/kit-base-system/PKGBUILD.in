@@ -43,6 +43,8 @@ package() {
   install -vDm440 files/sudoers-wheel "$pkgdir/etc/sudoers.d/kit-wheel"
   install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-zram.conf
   install -vDm644 -t "$pkgdir/etc/tlp.d" files/15-cpu-perf-on-ac.conf
+  install -vDm644 files/resolved.conf \
+    "$pkgdir/etc/systemd/resolved.conf.d/10-kit-base-system.conf"
   install -vDm644 -t "$pkgdir/etc/systemd" files/zram-generator.conf
   install -vDm644 files/modules-load-zram.conf \
     "$pkgdir/etc/modules-load.d/zram.conf"
