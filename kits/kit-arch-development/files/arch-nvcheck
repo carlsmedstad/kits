@@ -12,19 +12,26 @@ usage() {
 Usage: $argv0 [options...]
 
 Check for upstream updates for all packages maintained by the
-specified package maintainer.
+specified package maintainer. The results are written to
+check-<maintainer>.json in the cache directory and rendered as a
+listing of failed and out-of-date packages.
+
+Cache directory: $cache_dir
 
 Options:
   -m, --maintainer <user> Maintainer's packages to check
                           default: \$USER
+  --cached                Render the result file of the last run
+                          without checking anything
   -h, --help              Display this help message and exit
 EOF
 }
 
 maintainer=$USER
+cached=0
 
 opt_short='m:h'
-opt_long='maintainer:,help'
+opt_long='maintainer:,cached,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -34,6 +41,9 @@ while true; do
   -m | --maintainer)
     shift
     maintainer=${1:-}
+    ;;
+  --cached)
+    cached=1
     ;;
   -h | --help)
     usage
@@ -50,18 +60,73 @@ while true; do
   shift
 done
 
+if [ "$#" -ne 0 ]; then
+  usage
+  exit 1
+fi
+
+result_file=$cache_dir/check-$maintainer.json
+
+render() {
+  jq -r '
+    def section($title; $mark; $items):
+      if ($items | length) > 0
+      then $title, ($items[] | " \($mark) \(.)"), ""
+      else empty end;
+
+    def count($items):
+      if ($items | length) > 0 then $items | length else empty end;
+
+    map(select(.status == "failure")) as $failure
+    | map(select(.out_of_date)) as $out_of_date
+    | map(select(.status != "failure" and (.out_of_date | not))) as $up_to_date
+    | if length == 0 then empty else
+        section("Failure"; "x";
+          $failure | map("\(.pkgbase): \(.message)")),
+        section("Out-of-date"; "!";
+          $out_of_date | map("\(.pkgbase): upgrade from version \(.local_version) to \(.upstream_version)")),
+        "Summary",
+        " ✓ Up-to-date: \(count($up_to_date))",
+        " x Failure: \(count($failure))",
+        " ! Out-of-date: \(count($out_of_date))"
+      end
+  ' "$result_file"
+}
+
+if [ "$cached" -eq 1 ]; then
+  if [ ! -f "$result_file" ]; then
+    printf >&2 '%s: %s: does not exist, run %s first\n' "$argv0" "$result_file" "$argv0"
+    exit 1
+  fi
+  render
+  exit
+fi
+
 mkdir -p "$cache_dir"
 cd "$cache_dir"
+
+tmp=$(mktemp -d --tmpdir="$cache_dir")
+trap 'rm -rf "$tmp"' EXIT
 
 repos=(core core-testing extra extra-testing multilib multilib-testing)
 arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
   > "$cache_dir/pkgs.txt"
 
-cp -f /dev/null "$cache_dir/pkgs.missing.txt"
 while read -r pkg; do
-  [ -d "$pkg" ] || echo "$pkg" >> "$cache_dir/pkgs.missing.txt"
-done < "$cache_dir/pkgs.txt"
+  [ -d "$pkg" ] || echo "$pkg"
+done < "$cache_dir/pkgs.txt" > "$tmp/missing"
 
-xargs -a "$cache_dir/pkgs.missing.txt" --no-run-if-empty pkgctl repo clone
-xargs -a "$cache_dir/pkgs.txt" -P8 -I{} git -C {} pull
-xargs -a "$cache_dir/pkgs.txt" pkgctl version check
+xargs -a "$tmp/missing" --no-run-if-empty pkgctl repo clone
+xargs -a "$cache_dir/pkgs.txt" -P8 -I{} git -C {} pull --quiet
+
+checked_at=$(date -u +%FT%TZ)
+xargs -a "$cache_dir/pkgs.txt" --no-run-if-empty pkgctl version check --json --verbose \
+  | jq --arg checked_at "$checked_at" 'map(. + {checked_at: $checked_at}) | sort_by(.pkgbase)' \
+    > "$tmp/result.json"
+
+if [ ! -s "$tmp/result.json" ]; then
+  echo '[]' > "$tmp/result.json"
+fi
+
+mv -f "$tmp/result.json" "$result_file"
+render
