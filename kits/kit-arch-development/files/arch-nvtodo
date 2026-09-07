@@ -134,8 +134,19 @@ awk '
 ' "$tmp/todo" "$tmp/edges.all" | sort -u > "$tmp/edges"
 
 # tsort reports a cycle on stderr but still outputs every node.
-cut -d ' ' -f 1,2 "$tmp/edges" \
-  | tsort 2> >(sed "s/^tsort: \(-: \)\?/$argv0: /" >&2) > "$tmp/order" || true
+cut -d ' ' -f 1,2 "$tmp/edges" | tsort 2> "$tmp/loops" > "$tmp/order" || true
+
+awk -v argv0="$argv0" '
+  function report() {
+    if (!members) return
+    printf "%s: warning: %s depend on each other, their order is arbitrary\n", \
+      argv0, gensub(/, ([^,]*)$/, " and \\1", 1, members) > "/dev/stderr"
+    members = ""
+  }
+  /input contains a loop/ { report(); next }
+  { members = members (members ? ", " : "") $2 }
+  END { report() }
+' "$tmp/loops"
 
 awk -v full="$deps" '
   FILENAME == ARGV[1] {
