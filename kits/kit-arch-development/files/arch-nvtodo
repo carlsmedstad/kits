@@ -96,7 +96,7 @@ shopt -u nullglob
 # /dev/null keeps awk off stdin when there are no clones.
 awk '
   /^pkgbase = / { base = $3 }
-  /^pkg(base|name) = / { owner[$3] = base }
+  /^pkgname = / { owner[$3] = base }
   /^\tprovides(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); provider[$3] = base }
   /^\t(make|check)?depends(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); deps[base, $3] = 1 }
   END {
