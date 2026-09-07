@@ -1,0 +1,145 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-nvtodo
+
+cache_home=${XDG_CACHE_HOME:-$HOME/.cache}
+cache_dir=$cache_home/arch-nvcheck
+
+usage() {
+  cat << EOF >&2
+Usage: $argv0 [options...] [file]
+
+Print the out-of-date packages from an arch-nvcheck result file as a
+todo list in dependency order: a package is listed after every package
+it depends on that is also on the list, and packages that can be
+updated independently of each other are grouped into one batch. The
+dependency graph comes from the .SRCINFO files of the package clones
+in the cache directory.
+
+The file defaults to check-\$USER.json in the cache directory. Pass -
+to read standard input.
+
+Cache directory: $cache_dir
+
+Options:
+  -h, --help              Display this help message and exit
+EOF
+}
+
+opt_short='h'
+opt_long='help'
+if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
+  eval set -- "$opts"
+fi
+
+while true; do
+  case $1 in
+  -h | --help)
+    usage
+    exit
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+if [ "$#" -gt 1 ]; then
+  usage
+  exit 1
+fi
+
+file=${1:-$cache_dir/check-$USER.json}
+if [ "$file" = - ]; then
+  file=/dev/stdin
+elif [ ! -f "$file" ]; then
+  printf >&2 '%s: %s: does not exist, run arch-nvcheck first\n' "$argv0" "$file"
+  exit 1
+fi
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+jq -r '.[] | select(.out_of_date) | .pkgbase' "$file" | sort -u > "$tmp/todo"
+
+while read -r pkg; do
+  [ -d "$cache_dir/$pkg" ] \
+    || printf >&2 '%s: %s: no clone in %s, dependencies unknown\n' "$argv0" "$pkg" "$cache_dir"
+done < "$tmp/todo"
+
+awk '
+  /^pkgbase = / { base = $3 }
+  /^pkg(base|name) = / { owner[$3] = base }
+  /^\tprovides(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); owner[$3] = base }
+  /^\t(make|check)?depends(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); deps[base, $3] = 1 }
+  END {
+    for (key in deps) {
+      split(key, k, SUBSEP)
+      if ((k[2] in owner) && owner[k[2]] != k[1]) print owner[k[2]], k[1]
+    }
+  }
+' "$cache_dir"/*/.SRCINFO | sort -u > "$tmp/edges.all"
+
+awk '
+  FILENAME == ARGV[1] { todo[$1] = 1; next }
+  { pred[$2] = pred[$2] " " $1 }
+  function walk(node, target, via,    m, i, deps, d) {
+    m = split(pred[node], deps, " ")
+    for (i = 1; i <= m; i++) {
+      d = deps[i]
+      if (d == target || (d, target) in visited) continue
+      visited[d, target] = 1
+      if (d in todo) print d, target, via
+      else walk(d, target, via ? via : d)
+    }
+  }
+  END { for (p in todo) walk(p, p, "") }
+' "$tmp/todo" "$tmp/edges.all" | sort -u > "$tmp/edges"
+
+# tsort reports a cycle on stderr but still outputs every node.
+cut -d ' ' -f 1,2 "$tmp/edges" \
+  | tsort 2> >(sed "s/^tsort: \(-: \)\?/$argv0: /" >&2) > "$tmp/order" || true
+
+awk '
+  FILENAME == ARGV[1] { todo[$1] = 1; next }
+  FILENAME == ARGV[2] {
+    if (($1, $2) in via) next
+    via[$1, $2] = $3 ? " (via " $3 ")" : ""
+    pred[$2] = pred[$2] " " $1
+    next
+  }
+  { seen[$1] = 1; list[++n] = $1 }
+  END {
+    for (p in todo) if (!(p in seen)) list[++n] = p
+    for (i = 1; i <= n; i++) {
+      p = list[i]
+      batch[p] = 1
+      m = split(pred[p], deps, " ")
+      for (j = 1; j <= m; j++) {
+        d = deps[j]
+        after[p] = after[p] (after[p] ? ", " : "") d via[d, p]
+        if (batch[d] >= batch[p]) batch[p] = batch[d] + 1
+      }
+      if (batch[p] > max) max = batch[p]
+    }
+    for (b = 1; b <= max; b++) {
+      if (b > 1) print ""
+      printf "Batch %d\n", b
+      c = 0
+      delete members
+      for (i = 1; i <= n; i++) if (batch[list[i]] == b) members[++c] = list[i]
+      asort(members)
+      for (i = 1; i <= c; i++) {
+        p = members[i]
+        printf " %s%s\n", p, after[p] ? " (after: " after[p] ")" : ""
+      }
+    }
+  }
+' "$tmp/todo" "$tmp/edges" "$tmp/order"

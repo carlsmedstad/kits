@@ -28,6 +28,7 @@ package() {
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-diff
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-ls
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-nvcheck
+  install -vDm755 -t "$pkgdir/usr/bin" files/arch-nvtodo
   install -vDm755 -t "$pkgdir/usr/bin" files/arch-usage
 
   install -vDm755 -t "$pkgdir/usr/local/bin" files/signoff
