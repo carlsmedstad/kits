@@ -106,7 +106,16 @@ awk '
       else walk(d, target, via ? via : d)
     }
   }
-  END { for (p in todo) walk(p, p, "") }
+  END {
+    for (p in todo) {
+      m = split(pred[p], deps, " ")
+      for (i = 1; i <= m; i++) {
+        d = deps[i]
+        if (d in todo) { visited[d, p] = 1; print d, p, "" }
+      }
+      walk(p, p, "")
+    }
+  }
 ' "$tmp/todo" "$tmp/edges.all" | sort -u > "$tmp/edges"
 
 # tsort reports a cycle on stderr but still outputs every node.
