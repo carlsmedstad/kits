@@ -9,29 +9,35 @@ cache_dir=$cache_home/$argv0
 
 usage() {
   cat << EOF >&2
-Usage: $argv0 [options...]
+Usage: $argv0 [options...] [pkgbase...]
 
 Check for upstream updates for all packages maintained by the
-specified package maintainer. The results are written to
-check-<maintainer>.json in the cache directory and rendered as a
-listing of failed and out-of-date packages.
+specified package maintainer, or only for the given pkgbases. The
+results are written to check-<maintainer>.json in the cache directory
+and rendered as a listing of failed and out-of-date packages.
+
+Given pkgbases are merged into the result file of an earlier run.
+Without them the file is rewritten to contain exactly the maintainer's
+current packages.
 
 Cache directory: $cache_dir
 
 Options:
-  -m, --maintainer <user> Maintainer's packages to check
-                          default: \$USER
-  --cached                Render the result file of the last run
-                          without checking anything
-  -h, --help              Display this help message and exit
+  -m, --maintainer <user>  Maintainer's packages to check
+                           default: \$USER
+  --max-age <duration>     Skip packages checked without failure within
+                           the duration, e.g. '1 day' or '12 hours'
+  --cached                 Render the result file without checking
+  -h, --help               Display this help message and exit
 EOF
 }
 
 maintainer=$USER
+max_age=''
 cached=0
 
 opt_short='m:h'
-opt_long='maintainer:,cached,help'
+opt_long='maintainer:,max-age:,cached,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -41,6 +47,10 @@ while true; do
   -m | --maintainer)
     shift
     maintainer=${1:-}
+    ;;
+  --max-age)
+    shift
+    max_age=${1:-}
     ;;
   --cached)
     cached=1
@@ -59,11 +69,6 @@ while true; do
   esac
   shift
 done
-
-if [ "$#" -ne 0 ]; then
-  usage
-  exit 1
-fi
 
 result_file=$cache_dir/check-$maintainer.json
 
@@ -94,6 +99,10 @@ render() {
 }
 
 if [ "$cached" -eq 1 ]; then
+  if [ "$#" -ne 0 ] || [ -n "$max_age" ]; then
+    printf >&2 '%s: --cached takes no pkgbases or --max-age\n' "$argv0"
+    exit 1
+  fi
   if [ ! -f "$result_file" ]; then
     printf >&2 '%s: %s: does not exist, run %s first\n' "$argv0" "$result_file" "$argv0"
     exit 1
@@ -102,31 +111,67 @@ if [ "$cached" -eq 1 ]; then
   exit
 fi
 
+cutoff=''
+if [ -n "$max_age" ] && ! cutoff=$(date -u -d "$max_age ago" +%FT%TZ 2> /dev/null); then
+  printf >&2 '%s: %s: invalid duration\n' "$argv0" "$max_age"
+  exit 1
+fi
+
 mkdir -p "$cache_dir"
 cd "$cache_dir"
 
 tmp=$(mktemp -d --tmpdir="$cache_dir")
 trap 'rm -rf "$tmp"' EXIT
 
-repos=(core core-testing extra extra-testing multilib multilib-testing)
-arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
-  > "$cache_dir/pkgs.txt"
+if [ -f "$result_file" ]; then
+  cp "$result_file" "$tmp/old.json"
+else
+  echo '[]' > "$tmp/old.json"
+fi
+
+if [ "$#" -eq 0 ]; then
+  repos=(core core-testing extra extra-testing multilib multilib-testing)
+  arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
+    > "$cache_dir/pkgs.txt"
+  sort -u "$cache_dir/pkgs.txt" > "$tmp/candidates"
+  cp /dev/null "$tmp/keep"
+else
+  printf '%s\n' "$@" | sort -u > "$tmp/candidates"
+  jq -r '.[].pkgbase' "$tmp/old.json" | sort -u \
+    | comm -23 - "$tmp/candidates" > "$tmp/keep"
+fi
+
+if [ -n "$cutoff" ]; then
+  jq -r --arg cutoff "$cutoff" \
+    '.[] | select(.status != "failure" and .checked_at >= $cutoff) | .pkgbase' \
+    "$tmp/old.json" | sort -u > "$tmp/fresh"
+else
+  cp /dev/null "$tmp/fresh"
+fi
+comm -12 "$tmp/candidates" "$tmp/fresh" >> "$tmp/keep"
+comm -23 "$tmp/candidates" "$tmp/fresh" > "$tmp/check"
 
 while read -r pkg; do
   [ -d "$pkg" ] || echo "$pkg"
-done < "$cache_dir/pkgs.txt" > "$tmp/missing"
+done < "$tmp/check" > "$tmp/missing"
 
 xargs -a "$tmp/missing" --no-run-if-empty pkgctl repo clone
-xargs -a "$cache_dir/pkgs.txt" -P8 -I{} git -C {} pull --quiet
+xargs -a "$tmp/check" -P8 -I{} git -C {} pull --quiet
 
 checked_at=$(date -u +%FT%TZ)
-xargs -a "$cache_dir/pkgs.txt" --no-run-if-empty pkgctl version check --json --verbose \
-  | jq --arg checked_at "$checked_at" 'map(. + {checked_at: $checked_at}) | sort_by(.pkgbase)' \
-    > "$tmp/result.json"
-
-if [ ! -s "$tmp/result.json" ]; then
-  echo '[]' > "$tmp/result.json"
+xargs -a "$tmp/check" --no-run-if-empty pkgctl version check --json --verbose \
+  | jq --arg checked_at "$checked_at" 'map(. + {checked_at: $checked_at})' \
+    > "$tmp/new.json"
+if [ ! -s "$tmp/new.json" ]; then
+  echo '[]' > "$tmp/new.json"
 fi
+
+jq -n --rawfile keep "$tmp/keep" \
+  --slurpfile old "$tmp/old.json" --slurpfile new "$tmp/new.json" '
+  ($keep | split("\n") | map(select(. != "") | {(.): true}) | add // {}) as $keep
+  | ($old[0] | map(select($keep[.pkgbase]))) + $new[0]
+  | sort_by(.pkgbase)
+' > "$tmp/result.json"
 
 mv -f "$tmp/result.json" "$result_file"
 render
