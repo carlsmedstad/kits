@@ -83,6 +83,15 @@ case $jobs in
   ;;
 esac
 
+for pkg in "$@"; do
+  case $pkg in
+  '' | . | .. | */*)
+    printf >&2 '%s: %s: invalid pkgbase\n' "$argv0" "$pkg"
+    exit 1
+    ;;
+  esac
+done
+
 result_file=$cache_dir/check-$maintainer.json
 
 result_file_is_array() {
@@ -233,8 +242,8 @@ check_one() {
 
 worker() {
   local pkg=$1 entry=$tmp/entries/$1
-  check_one "$pkg" > "$entry.tmp" 2> "$entry.err"
-  mv "$entry.tmp" "$entry"
+  check_one "$pkg" > "$entry.tmp" 2> "$entry.err" || return
+  mv "$entry.tmp" "$entry" || return
   echo "$pkg"
 }
 
