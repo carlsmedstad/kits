@@ -85,6 +85,10 @@ esac
 
 result_file=$cache_dir/check-$maintainer.json
 
+result_file_is_array() {
+  jq -e 'type == "array"' "$result_file" > /dev/null 2>&1
+}
+
 render() {
   local all_off='' bold='' underline='' green='' red='' yellow=''
   local purple='' dark_green=''
@@ -139,6 +143,10 @@ if [ "$cached" -eq 1 ]; then
     printf >&2 '%s: %s: does not exist, run %s first\n' "$argv0" "$result_file" "$argv0"
     exit 1
   fi
+  if ! result_file_is_array; then
+    printf >&2 '%s: %s: not a JSON array, run %s to rebuild it\n' "$argv0" "$result_file" "$argv0"
+    exit 1
+  fi
   render
   exit
 fi
@@ -155,9 +163,12 @@ cd "$cache_dir"
 tmp=$(mktemp -d --tmpdir="$cache_dir")
 trap 'rm -rf "$tmp"' EXIT
 
-if [ -f "$result_file" ]; then
+if [ ! -f "$result_file" ]; then
+  echo '[]' > "$tmp/old.json"
+elif result_file_is_array; then
   cp "$result_file" "$tmp/old.json"
 else
+  printf >&2 '%s: warning: %s: not a JSON array, rebuilding it\n' "$argv0" "$result_file"
   echo '[]' > "$tmp/old.json"
 fi
 
