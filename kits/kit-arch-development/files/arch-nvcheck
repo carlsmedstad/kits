@@ -156,7 +156,10 @@ while read -r pkg; do
 done < "$tmp/check" > "$tmp/missing"
 
 xargs -a "$tmp/missing" --no-run-if-empty pkgctl repo clone
-xargs -a "$tmp/check" -P8 -I{} git -C {} pull --quiet
+# shellcheck disable=SC2016
+xargs -a "$tmp/check" -P8 -I{} sh -c \
+  'git -C "$1" pull --quiet || printf >&2 "%s: %s: git pull failed\n" "$0" "$1"' \
+  "$argv0" {}
 
 checked_at=$(date -u +%FT%TZ)
 xargs -a "$tmp/check" --no-run-if-empty pkgctl version check --json --verbose \
