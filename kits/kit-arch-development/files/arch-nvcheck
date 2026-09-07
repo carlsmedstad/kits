@@ -191,15 +191,11 @@ jq -r --rawfile stale "$tmp/stale" '
   | .[]
 ' "$tmp/old.json" > "$tmp/check"
 
-write_result() {
-  cat > "$tmp/result.json"
-  mv -f "$tmp/result.json" "$result_file"
-}
-
 jq --rawfile retain "$tmp/retain" '
   ($retain | split("\n") | map(select(. != "") | {(.): true}) | add // {}) as $retain
   | map(select($retain[.pkgbase]))
-' "$tmp/old.json" | write_result
+' "$tmp/old.json" > "$tmp/result.json"
+mv -f "$tmp/result.json" "$result_file"
 
 failure_entry() {
   jq -n --arg pkgbase "$1" --arg message "$2" \
@@ -232,9 +228,11 @@ worker() {
 }
 
 merge() {
-  jq --slurpfile entry "$1" '
+  jq --slurpfile entry "$tmp/entries/$1" '
     map(select(.pkgbase != $entry[0].pkgbase)) + $entry | sort_by(.pkgbase)
-  ' "$result_file" | write_result
+  ' "$result_file" > "$tmp/result.json" \
+    && mv -f "$tmp/result.json" "$result_file" \
+    || printf >&2 '%s: %s: merging its entry failed\n' "$argv0" "$1"
 }
 
 progress=0
@@ -271,7 +269,7 @@ xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
       clear_progress
       cat "$entry.err" >&2
     fi
-    merge "$entry"
+    merge "$pkg"
     case $(jq -r '
       if .status == "failure" then "failure"
       elif .out_of_date then "out-of-date"
