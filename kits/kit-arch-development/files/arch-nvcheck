@@ -149,7 +149,16 @@ else
   cp /dev/null "$tmp/fresh"
 fi
 comm -12 "$tmp/candidates" "$tmp/fresh" >> "$tmp/keep"
-comm -23 "$tmp/candidates" "$tmp/fresh" > "$tmp/check"
+comm -23 "$tmp/candidates" "$tmp/fresh" > "$tmp/stale"
+
+jq -r --rawfile stale "$tmp/stale" '
+  INDEX(.pkgbase) as $old
+  | $stale | split("\n") | map(select(. != ""))
+  | sort_by($old[.] // {}
+      | (if .status == null then 0 elif .status == "failure" then 1 else 2 end),
+        .checked_at)
+  | .[]
+' "$tmp/old.json" > "$tmp/check"
 
 while read -r pkg; do
   [ -d "$pkg" ] || echo "$pkg"
