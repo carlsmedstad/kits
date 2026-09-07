@@ -134,7 +134,7 @@ awk '
 ' "$tmp/todo" "$tmp/edges.all" | sort -u > "$tmp/edges"
 
 # tsort reports a cycle on stderr but still outputs every node.
-cut -d ' ' -f 1,2 "$tmp/edges" | tsort 2> "$tmp/loops" > "$tmp/order" || true
+cut -d ' ' -f 1,2 "$tmp/edges" | LC_ALL=C tsort 2> "$tmp/loops" > "$tmp/order" || true
 
 awk -v argv0="$argv0" '
   function report() {
