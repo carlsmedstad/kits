@@ -25,6 +25,7 @@ Cache directory: $cache_dir
 Options:
   -m, --maintainer <user>  Maintainer's packages to check
                            default: \$USER
+  -j, --jobs <n>           Packages to check at a time, default: 4
   --max-age <duration>     Skip packages checked without failure within
                            the duration, e.g. '1 day' or '12 hours'
   --cached                 Render the result file without checking
@@ -33,11 +34,12 @@ EOF
 }
 
 maintainer=$USER
+jobs=4
 max_age=''
 cached=0
 
-opt_short='m:h'
-opt_long='maintainer:,max-age:,cached,help'
+opt_short='m:j:h'
+opt_long='maintainer:,jobs:,max-age:,cached,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -47,6 +49,10 @@ while true; do
   -m | --maintainer)
     shift
     maintainer=${1:-}
+    ;;
+  -j | --jobs)
+    shift
+    jobs=${1:-}
     ;;
   --max-age)
     shift
@@ -69,6 +75,13 @@ while true; do
   esac
   shift
 done
+
+case $jobs in
+'' | *[!0-9]* | 0)
+  printf >&2 '%s: %s: invalid job count\n' "$argv0" "$jobs"
+  exit 1
+  ;;
+esac
 
 result_file=$cache_dir/check-$maintainer.json
 
@@ -134,11 +147,11 @@ if [ "$#" -eq 0 ]; then
   arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
     > "$cache_dir/pkgs.txt"
   sort -u "$cache_dir/pkgs.txt" > "$tmp/candidates"
-  cp /dev/null "$tmp/keep"
+  cp "$tmp/candidates" "$tmp/retain"
 else
   printf '%s\n' "$@" | sort -u > "$tmp/candidates"
-  jq -r '.[].pkgbase' "$tmp/old.json" | sort -u \
-    | comm -23 - "$tmp/candidates" > "$tmp/keep"
+  jq -r '.[].pkgbase' "$tmp/old.json" | cat - "$tmp/candidates" | sort -u \
+    > "$tmp/retain"
 fi
 
 if [ -n "$cutoff" ]; then
@@ -148,7 +161,6 @@ if [ -n "$cutoff" ]; then
 else
   cp /dev/null "$tmp/fresh"
 fi
-comm -12 "$tmp/candidates" "$tmp/fresh" >> "$tmp/keep"
 comm -23 "$tmp/candidates" "$tmp/fresh" > "$tmp/stale"
 
 jq -r --rawfile stale "$tmp/stale" '
@@ -160,27 +172,51 @@ jq -r --rawfile stale "$tmp/stale" '
   | .[]
 ' "$tmp/old.json" > "$tmp/check"
 
-while read -r pkg; do
-  [ -d "$pkg" ] || echo "$pkg"
-done < "$tmp/check" > "$tmp/missing"
+write_result() {
+  cat > "$tmp/result.json"
+  mv -f "$tmp/result.json" "$result_file"
+}
 
-xargs -a "$tmp/missing" --no-run-if-empty pkgctl repo clone
+jq --rawfile retain "$tmp/retain" '
+  ($retain | split("\n") | map(select(. != "") | {(.): true}) | add // {}) as $retain
+  | map(select($retain[.pkgbase]))
+' "$tmp/old.json" | write_result
+
+check_one() {
+  local pkg=$1
+  if [ ! -d "$pkg" ]; then
+    pkgctl repo clone "$pkg" >&2 || return
+  fi
+  git -C "$pkg" pull --quiet >&2 \
+    || printf >&2 '%s: %s: git pull failed\n' "$argv0" "$pkg"
+  { pkgctl version check --json --verbose "$pkg" || true; } \
+    | jq -es --arg checked_at "$(date -u +%FT%TZ)" \
+      'add // [] | .[0] // empty | . + {checked_at: $checked_at}'
+}
+
+worker() {
+  local pkg=$1 entry=$tmp/entries/$1
+  if check_one "$pkg" > "$entry.tmp"; then
+    mv "$entry.tmp" "$entry"
+    echo "$pkg"
+  fi
+}
+
+merge() {
+  jq --slurpfile entry "$1" '
+    map(select(.pkgbase != $entry[0].pkgbase)) + $entry | sort_by(.pkgbase)
+  ' "$result_file" | write_result
+}
+
+mkdir "$tmp/entries"
+export -f check_one worker
+export tmp argv0
+
 # shellcheck disable=SC2016
-xargs -a "$tmp/check" -P8 -I{} sh -c \
-  'git -C "$1" pull --quiet || printf >&2 "%s: %s: git pull failed\n" "$0" "$1"' \
-  "$argv0" {}
+xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
+  bash -c 'worker "$1"' "$argv0" \
+  | while read -r pkg; do
+    merge "$tmp/entries/$pkg"
+  done
 
-checked_at=$(date -u +%FT%TZ)
-xargs -a "$tmp/check" --no-run-if-empty pkgctl version check --json --verbose \
-  | jq -s --arg checked_at "$checked_at" 'add // [] | map(. + {checked_at: $checked_at})' \
-    > "$tmp/new.json"
-
-jq -n --rawfile keep "$tmp/keep" \
-  --slurpfile old "$tmp/old.json" --slurpfile new "$tmp/new.json" '
-  ($keep | split("\n") | map(select(. != "") | {(.): true}) | add // {}) as $keep
-  | ($old[0] | map(select($keep[.pkgbase]))) + $new[0]
-  | sort_by(.pkgbase)
-' > "$tmp/result.json"
-
-mv -f "$tmp/result.json" "$result_file"
 render
