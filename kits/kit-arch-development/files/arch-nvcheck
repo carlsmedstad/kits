@@ -9,22 +9,37 @@ cache_dir=$cache_home/$argv0
 
 usage() {
   cat << EOF >&2
-Usage: $argv0 [options...]
+Usage: $argv0 [options...] [pkgbase...]
 
 Check for upstream updates for all packages maintained by the
-specified package maintainer.
+specified package maintainer, or only for the given pkgbases. The
+results are written to check-<maintainer>.json in the cache directory
+and rendered as a listing of failed and out-of-date packages.
+
+Given pkgbases are merged into the result file of an earlier run.
+Without them the file is rewritten to contain exactly the maintainer's
+current packages.
+
+Cache directory: $cache_dir
 
 Options:
-  -m, --maintainer <user> Maintainer's packages to check
-                          default: \$USER
-  -h, --help              Display this help message and exit
+  -m, --maintainer <user>  Maintainer's packages to check
+                           default: \$USER
+  -j, --jobs <n>           Packages to check at a time, default: 4
+  --max-age <duration>     Skip packages checked without failure within
+                           the duration, e.g. '1 day' or '12 hours'
+  --cached                 Render the result file without checking
+  -h, --help               Display this help message and exit
 EOF
 }
 
 maintainer=$USER
+jobs=4
+max_age=''
+cached=0
 
-opt_short='m:h'
-opt_long='maintainer:,help'
+opt_short='m:j:h'
+opt_long='maintainer:,jobs:,max-age:,cached,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -34,6 +49,17 @@ while true; do
   -m | --maintainer)
     shift
     maintainer=${1:-}
+    ;;
+  -j | --jobs)
+    shift
+    jobs=${1:-}
+    ;;
+  --max-age)
+    shift
+    max_age=${1:-}
+    ;;
+  --cached)
+    cached=1
     ;;
   -h | --help)
     usage
@@ -50,18 +76,246 @@ while true; do
   shift
 done
 
+case $jobs in
+'' | *[!0-9]* | 0)
+  printf >&2 '%s: %s: invalid job count\n' "$argv0" "$jobs"
+  exit 1
+  ;;
+esac
+
+for pkg in "$@"; do
+  case $pkg in
+  '' | . | .. | */*)
+    printf >&2 '%s: %s: invalid pkgbase\n' "$argv0" "$pkg"
+    exit 1
+    ;;
+  esac
+done
+
+result_file=$cache_dir/check-$maintainer.json
+
+result_file_is_array() {
+  jq -e 'type == "array"' "$result_file" > /dev/null 2>&1
+}
+
+render() {
+  local all_off='' bold='' underline='' green='' red='' yellow=''
+  local purple='' dark_green=''
+  if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && tput setaf 0 > /dev/null 2>&1; then
+    all_off=$(tput sgr0)
+    bold=$(tput bold)
+    underline=$(tput smul)
+    green=$bold$(tput setaf 2)
+    red=$bold$(tput setaf 1)
+    yellow=$bold$(tput setaf 3)
+    purple=$(tput setaf 5)
+    dark_green=$(tput setaf 2)
+  fi
+
+  jq -r --arg all_off "$all_off" --arg bold "$bold" --arg underline "$underline" \
+    --arg green "$green" --arg red "$red" --arg yellow "$yellow" \
+    --arg purple "$purple" --arg dark_green "$dark_green" '
+    def title($text): "\($bold)\($underline)\($text)\($all_off)";
+
+    def section($name; $mark; $items):
+      if ($items | length) > 0
+      then title($name), ($items[] | " \($mark) \(.)"), ""
+      else empty end;
+
+    def count($items):
+      if ($items | length) > 0
+      then "\($bold)\($items | length)\($all_off)"
+      else empty end;
+
+    map(select(.status == "failure")) as $failure
+    | map(select(.out_of_date)) as $out_of_date
+    | map(select(.status != "failure" and (.out_of_date | not))) as $up_to_date
+    | if length == 0 then empty else
+        section("Failure"; "\($red)x\($all_off)";
+          $failure | map("\($bold)\(.pkgbase)\($all_off): \(.message)")),
+        section("Out-of-date"; "\($yellow)!\($all_off)";
+          $out_of_date | map("\($bold)\(.pkgbase)\($all_off): upgrade from version \($purple)\(.local_version)\($all_off) to \($dark_green)\(.upstream_version)\($all_off)")),
+        title("Summary"),
+        " \($green)✓\($all_off) Up-to-date: \(count($up_to_date))",
+        " \($red)x\($all_off) Failure: \(count($failure))",
+        " \($yellow)!\($all_off) Out-of-date: \(count($out_of_date))"
+      end
+  ' "$result_file"
+}
+
+if [ "$cached" -eq 1 ]; then
+  if [ "$#" -ne 0 ] || [ -n "$max_age" ]; then
+    printf >&2 '%s: --cached takes no pkgbases or --max-age\n' "$argv0"
+    exit 1
+  fi
+  if [ ! -f "$result_file" ]; then
+    printf >&2 '%s: %s: does not exist, run %s first\n' "$argv0" "$result_file" "$argv0"
+    exit 1
+  fi
+  if ! result_file_is_array; then
+    printf >&2 '%s: %s: not a JSON array, run %s to rebuild it\n' "$argv0" "$result_file" "$argv0"
+    exit 1
+  fi
+  render
+  exit
+fi
+
+cutoff=''
+if [ -n "$max_age" ] && ! cutoff=$(date -u -d "$max_age ago" +%FT%TZ 2> /dev/null); then
+  printf >&2 '%s: %s: invalid duration\n' "$argv0" "$max_age"
+  exit 1
+fi
+
 mkdir -p "$cache_dir"
 cd "$cache_dir"
 
-repos=(core core-testing extra extra-testing multilib multilib-testing)
-arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
-  > "$cache_dir/pkgs.txt"
+tmp=$(mktemp -d --tmpdir="$cache_dir")
+trap 'rm -rf "$tmp"' EXIT
 
-cp -f /dev/null "$cache_dir/pkgs.missing.txt"
-while read -r pkg; do
-  [ -d "$pkg" ] || echo "$pkg" >> "$cache_dir/pkgs.missing.txt"
-done < "$cache_dir/pkgs.txt"
+if [ ! -f "$result_file" ]; then
+  echo '[]' > "$tmp/old.json"
+elif result_file_is_array; then
+  cp "$result_file" "$tmp/old.json"
+else
+  printf >&2 '%s: warning: %s: not a JSON array, rebuilding it\n' "$argv0" "$result_file"
+  echo '[]' > "$tmp/old.json"
+fi
 
-xargs -a "$cache_dir/pkgs.missing.txt" --no-run-if-empty pkgctl repo clone
-xargs -a "$cache_dir/pkgs.txt" -P8 -I{} git -C {} pull
-xargs -a "$cache_dir/pkgs.txt" pkgctl version check
+if [ "$#" -eq 0 ]; then
+  repos=(core core-testing extra extra-testing multilib multilib-testing)
+  arch-ls --maintainer "$maintainer" --jq-query .pkgbase "${repos[@]}" \
+    > "$cache_dir/pkgs.txt"
+  sort -u "$cache_dir/pkgs.txt" > "$tmp/candidates"
+  cp "$tmp/candidates" "$tmp/retain"
+else
+  printf '%s\n' "$@" | sort -u > "$tmp/candidates"
+  jq -r '.[].pkgbase' "$tmp/old.json" | cat - "$tmp/candidates" | sort -u \
+    > "$tmp/retain"
+fi
+
+if [ -n "$cutoff" ]; then
+  jq -r --arg cutoff "$cutoff" \
+    '.[] | select(.status != "failure" and .checked_at >= $cutoff) | .pkgbase' \
+    "$tmp/old.json" | sort -u > "$tmp/fresh"
+else
+  cp /dev/null "$tmp/fresh"
+fi
+comm -23 "$tmp/candidates" "$tmp/fresh" > "$tmp/stale"
+
+jq -r --rawfile stale "$tmp/stale" '
+  INDEX(.pkgbase) as $old
+  | $stale | split("\n") | map(select(. != ""))
+  | sort_by($old[.] // {}
+      | (if .status == null then 0 elif .status == "failure" then 1 else 2 end),
+        .checked_at)
+  | .[]
+' "$tmp/old.json" > "$tmp/check"
+
+jq --rawfile retain "$tmp/retain" '
+  ($retain | split("\n") | map(select(. != "") | {(.): true}) | add // {}) as $retain
+  | map(select($retain[.pkgbase]))
+' "$tmp/old.json" > "$tmp/result.json"
+mv -f "$tmp/result.json" "$result_file"
+
+failure_entry() {
+  jq -n --arg pkgbase "$1" --arg message "$2" \
+    --arg checked_at "$(date -u +%FT%TZ)" '{
+      pkgbase: $pkgbase, status: "failure", message: $message,
+      local_version: null, upstream_version: null, out_of_date: false,
+      checked_at: $checked_at
+    }'
+}
+
+check_one() {
+  local pkg=$1
+  if [ ! -d "$pkg" ] && ! TERM=dumb pkgctl repo clone "$pkg" >&2; then
+    failure_entry "$pkg" 'pkgctl repo clone failed'
+    return
+  fi
+  git -C "$pkg" pull --quiet >&2 \
+    || printf >&2 '%s: %s: git pull failed\n' "$argv0" "$pkg"
+  { TERM=dumb pkgctl version check --json --verbose "$pkg" || true; } \
+    | jq -es --arg checked_at "$(date -u +%FT%TZ)" \
+      'add // [] | .[0] // empty | . + {checked_at: $checked_at}' \
+    || failure_entry "$pkg" 'pkgctl version check produced no entry'
+}
+
+worker() {
+  local pkg=$1 entry=$tmp/entries/$1
+  check_one "$pkg" > "$entry.tmp" 2> "$entry.err" || return
+  mv "$entry.tmp" "$entry" || return
+  echo "$pkg"
+}
+
+merge() {
+  jq --slurpfile entry "$tmp/entries/$1" '
+    map(select(.pkgbase != $entry[0].pkgbase)) + $entry | sort_by(.pkgbase)
+  ' "$result_file" > "$tmp/result.json" \
+    && mv -f "$tmp/result.json" "$result_file" \
+    || printf >&2 '%s: %s: merging its entry failed\n' "$argv0" "$1"
+}
+
+sweep() {
+  local entry
+  for entry in "$tmp"/entries/*; do
+    case $entry in
+    *.tmp | *.err) continue ;;
+    esac
+    [ -f "$entry" ] || continue
+    merge "${entry##*/}"
+  done
+}
+
+progress=0
+if [ -t 2 ] && clear_line=$(tput el 2> /dev/null); then
+  progress=1
+fi
+total=$(wc -l < "$tmp/check")
+checked=0
+out_of_date=0
+failed=0
+
+show_progress() {
+  [ "$progress" -eq 1 ] || return 0
+  printf >&2 '\r%s%d/%d checked, %d out-of-date, %d failed' \
+    "$clear_line" "$checked" "$total" "$out_of_date" "$failed"
+}
+
+clear_progress() {
+  [ "$progress" -eq 1 ] || return 0
+  printf >&2 '\r%s' "$clear_line"
+}
+
+mkdir "$tmp/entries"
+export -f failure_entry check_one worker
+export tmp argv0
+
+trap 'sweep; rm -rf "$tmp"' EXIT
+trap 'clear_progress; exit 130' INT
+
+[ "$total" -eq 0 ] || show_progress
+# shellcheck disable=SC2016
+xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
+  bash -c 'worker "$1"' "$argv0" \
+  | while read -r pkg; do
+    entry=$tmp/entries/$pkg
+    if [ -s "$entry.err" ]; then
+      clear_progress
+      cat "$entry.err" >&2
+    fi
+    merge "$pkg"
+    case $(jq -r '
+      if .status == "failure" then "failure"
+      elif .out_of_date then "out-of-date"
+      else "up-to-date" end
+    ' "$entry") in
+    failure) failed=$((failed + 1)) ;;
+    out-of-date) out_of_date=$((out_of_date + 1)) ;;
+    esac
+    rm -f "$entry" "$entry.err"
+    checked=$((checked + 1))
+    show_progress
+  done
+clear_progress
+
+render
