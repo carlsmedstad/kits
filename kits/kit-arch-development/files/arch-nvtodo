@@ -74,6 +74,11 @@ while read -r pkg; do
     || printf >&2 '%s: %s: no clone in %s, dependencies unknown\n' "$argv0" "$pkg" "$cache_dir"
 done < "$tmp/todo"
 
+shopt -s nullglob
+srcinfos=("$cache_dir"/*/.SRCINFO)
+shopt -u nullglob
+
+# /dev/null keeps awk off stdin when there are no clones.
 awk '
   /^pkgbase = / { base = $3 }
   /^pkg(base|name) = / { owner[$3] = base }
@@ -86,7 +91,7 @@ awk '
       if ((k[2] in owner) && owner[k[2]] != k[1]) print owner[k[2]], k[1]
     }
   }
-' "$cache_dir"/*/.SRCINFO | sort -u > "$tmp/edges.all"
+' /dev/null "${srcinfos[@]}" | sort -u > "$tmp/edges.all"
 
 awk '
   FILENAME == ARGV[1] { todo[$1] = 1; next }
