@@ -148,7 +148,13 @@ awk -v argv0="$argv0" '
   END { report() }
 ' "$tmp/loops"
 
-awk -v full="$deps" '
+bold=''
+all_off=''
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && bold=$(tput bold 2> /dev/null); then
+  all_off=$(tput sgr0)
+fi
+
+awk -v full="$deps" -v bold="$bold" -v all_off="$all_off" '
   FILENAME == ARGV[1] {
     todo[$1] = 1
     if (NF == 3) version[$1] = " " $2 " -> " $3
@@ -175,7 +181,7 @@ awk -v full="$deps" '
     }
     for (b = 1; b <= max; b++) {
       if (b > 1) print ""
-      printf "Batch %d\n", b
+      printf "%sBatch %d%s\n", bold, b, all_off
       c = 0
       delete members
       for (i = 1; i <= n; i++) if (batch[list[i]] == b) members[++c] = list[i]
