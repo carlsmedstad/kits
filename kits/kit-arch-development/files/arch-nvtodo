@@ -18,24 +18,34 @@ updated independently of each other are grouped into one batch. The
 dependency graph comes from the .SRCINFO files of the package clones
 in the cache directory.
 
+Each line shows the package with its local and upstream version and,
+in parentheses, the packages in the previous batch it waits on.
+
 The file defaults to check-\$USER.json in the cache directory. Pass -
 to read standard input.
 
 Cache directory: $cache_dir
 
 Options:
+  --deps                  Show every out-of-date dependency, with the
+                          package an indirect dependency goes via
   -h, --help              Display this help message and exit
 EOF
 }
 
+deps=0
+
 opt_short='h'
-opt_long='help'
+opt_long='deps,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
 
 while true; do
   case $1 in
+  --deps)
+    deps=1
+    ;;
   -h | --help)
     usage
     exit
@@ -67,9 +77,14 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-jq -r '.[] | select(.out_of_date) | .pkgbase' "$file" | sort -u > "$tmp/todo"
+jq -r '
+  .[] | select(.out_of_date)
+  | if .local_version and .upstream_version
+    then "\(.pkgbase) \(.local_version) \(.upstream_version)"
+    else .pkgbase end
+' "$file" | sort -u > "$tmp/todo"
 
-while read -r pkg; do
+while read -r pkg _; do
   [ -d "$cache_dir/$pkg" ] \
     || printf >&2 '%s: %s: no clone in %s, dependencies unknown\n' "$argv0" "$pkg" "$cache_dir"
 done < "$tmp/todo"
@@ -122,8 +137,12 @@ awk '
 cut -d ' ' -f 1,2 "$tmp/edges" \
   | tsort 2> >(sed "s/^tsort: \(-: \)\?/$argv0: /" >&2) > "$tmp/order" || true
 
-awk '
-  FILENAME == ARGV[1] { todo[$1] = 1; next }
+awk -v full="$deps" '
+  FILENAME == ARGV[1] {
+    todo[$1] = 1
+    if (NF == 3) version[$1] = " " $2 " -> " $3
+    next
+  }
   FILENAME == ARGV[2] {
     if (($1, $2) in via) next
     via[$1, $2] = $3 ? " (via " $3 ")" : ""
@@ -139,7 +158,6 @@ awk '
       m = split(pred[p], deps, " ")
       for (j = 1; j <= m; j++) {
         d = deps[j]
-        after[p] = after[p] (after[p] ? ", " : "") d via[d, p]
         if (batch[d] >= batch[p]) batch[p] = batch[d] + 1
       }
       if (batch[p] > max) max = batch[p]
@@ -153,7 +171,14 @@ awk '
       asort(members)
       for (i = 1; i <= c; i++) {
         p = members[i]
-        printf " %s%s\n", p, after[p] ? " (after: " after[p] ")" : ""
+        after = ""
+        m = split(pred[p], deps, " ")
+        for (j = 1; j <= m; j++) {
+          d = deps[j]
+          if (full) after = after (after ? ", " : "") d via[d, p]
+          else if (batch[d] == b - 1) after = after (after ? ", " : "") d
+        }
+        printf " %s%s%s\n", p, version[p], after ? "  (" after ")" : ""
       }
     }
   }
