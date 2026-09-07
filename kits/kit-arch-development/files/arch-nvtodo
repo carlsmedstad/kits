@@ -77,9 +77,10 @@ done < "$tmp/todo"
 awk '
   /^pkgbase = / { base = $3 }
   /^pkg(base|name) = / { owner[$3] = base }
-  /^\tprovides(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); owner[$3] = base }
+  /^\tprovides(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); provider[$3] = base }
   /^\t(make|check)?depends(_[a-z0-9_]+)? = / { sub(/[<>=].*/, "", $3); deps[base, $3] = 1 }
   END {
+    for (name in provider) if (!(name in owner)) owner[name] = provider[name]
     for (key in deps) {
       split(key, k, SUBSEP)
       if ((k[2] in owner) && owner[k[2]] != k[1]) print owner[k[2]], k[1]
