@@ -160,11 +160,8 @@ xargs -a "$tmp/check" -P8 -I{} git -C {} pull --quiet
 
 checked_at=$(date -u +%FT%TZ)
 xargs -a "$tmp/check" --no-run-if-empty pkgctl version check --json --verbose \
-  | jq --arg checked_at "$checked_at" 'map(. + {checked_at: $checked_at})' \
+  | jq -s --arg checked_at "$checked_at" 'add // [] | map(. + {checked_at: $checked_at})' \
     > "$tmp/new.json"
-if [ ! -s "$tmp/new.json" ]; then
-  echo '[]' > "$tmp/new.json"
-fi
 
 jq -n --rawfile keep "$tmp/keep" \
   --slurpfile old "$tmp/old.json" --slurpfile new "$tmp/new.json" '
