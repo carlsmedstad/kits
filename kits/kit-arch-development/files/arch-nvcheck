@@ -207,7 +207,7 @@ check_one() {
 
 worker() {
   local pkg=$1 entry=$tmp/entries/$1
-  check_one "$pkg" > "$entry.tmp"
+  check_one "$pkg" > "$entry.tmp" 2> "$entry.err"
   mv "$entry.tmp" "$entry"
   echo "$pkg"
 }
@@ -218,15 +218,52 @@ merge() {
   ' "$result_file" | write_result
 }
 
+progress=0
+if [ -t 2 ] && clear_line=$(tput el 2> /dev/null); then
+  progress=1
+fi
+total=$(wc -l < "$tmp/check")
+checked=0
+out_of_date=0
+failed=0
+
+show_progress() {
+  [ "$progress" -eq 1 ] || return 0
+  printf >&2 '\r%s%d/%d checked, %d out-of-date, %d failed' \
+    "$clear_line" "$checked" "$total" "$out_of_date" "$failed"
+}
+
+clear_progress() {
+  [ "$progress" -eq 1 ] || return 0
+  printf >&2 '\r%s' "$clear_line"
+}
+
 mkdir "$tmp/entries"
 export -f failure_entry check_one worker
 export tmp argv0
 
+[ "$total" -eq 0 ] || show_progress
 # shellcheck disable=SC2016
 xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
   bash -c 'worker "$1"' "$argv0" \
   | while read -r pkg; do
-    merge "$tmp/entries/$pkg"
+    entry=$tmp/entries/$pkg
+    if [ -s "$entry.err" ]; then
+      clear_progress
+      cat "$entry.err" >&2
+    fi
+    merge "$entry"
+    case $(jq -r '
+      if .status == "failure" then "failure"
+      elif .out_of_date then "out-of-date"
+      else "up-to-date" end
+    ' "$entry") in
+    failure) failed=$((failed + 1)) ;;
+    out-of-date) out_of_date=$((out_of_date + 1)) ;;
+    esac
+    checked=$((checked + 1))
+    show_progress
   done
+clear_progress
 
 render
