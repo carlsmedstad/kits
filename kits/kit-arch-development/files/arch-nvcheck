@@ -182,24 +182,34 @@ jq --rawfile retain "$tmp/retain" '
   | map(select($retain[.pkgbase]))
 ' "$tmp/old.json" | write_result
 
+failure_entry() {
+  jq -n --arg pkgbase "$1" --arg message "$2" \
+    --arg checked_at "$(date -u +%FT%TZ)" '{
+      pkgbase: $pkgbase, status: "failure", message: $message,
+      local_version: null, upstream_version: null, out_of_date: false,
+      checked_at: $checked_at
+    }'
+}
+
 check_one() {
   local pkg=$1
-  if [ ! -d "$pkg" ]; then
-    pkgctl repo clone "$pkg" >&2 || return
+  if [ ! -d "$pkg" ] && ! pkgctl repo clone "$pkg" >&2; then
+    failure_entry "$pkg" 'pkgctl repo clone failed'
+    return
   fi
   git -C "$pkg" pull --quiet >&2 \
     || printf >&2 '%s: %s: git pull failed\n' "$argv0" "$pkg"
   { pkgctl version check --json --verbose "$pkg" || true; } \
     | jq -es --arg checked_at "$(date -u +%FT%TZ)" \
-      'add // [] | .[0] // empty | . + {checked_at: $checked_at}'
+      'add // [] | .[0] // empty | . + {checked_at: $checked_at}' \
+    || failure_entry "$pkg" 'pkgctl version check produced no entry'
 }
 
 worker() {
   local pkg=$1 entry=$tmp/entries/$1
-  if check_one "$pkg" > "$entry.tmp"; then
-    mv "$entry.tmp" "$entry"
-    echo "$pkg"
-  fi
+  check_one "$pkg" > "$entry.tmp"
+  mv "$entry.tmp" "$entry"
+  echo "$pkg"
 }
 
 merge() {
@@ -209,7 +219,7 @@ merge() {
 }
 
 mkdir "$tmp/entries"
-export -f check_one worker
+export -f failure_entry check_one worker
 export tmp argv0
 
 # shellcheck disable=SC2016
