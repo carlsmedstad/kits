@@ -255,6 +255,17 @@ merge() {
     || printf >&2 '%s: %s: merging its entry failed\n' "$argv0" "$1"
 }
 
+sweep() {
+  local entry
+  for entry in "$tmp"/entries/*; do
+    case $entry in
+    *.tmp | *.err) continue ;;
+    esac
+    [ -f "$entry" ] || continue
+    merge "${entry##*/}"
+  done
+}
+
 progress=0
 if [ -t 2 ] && clear_line=$(tput el 2> /dev/null); then
   progress=1
@@ -279,6 +290,9 @@ mkdir "$tmp/entries"
 export -f failure_entry check_one worker
 export tmp argv0
 
+trap 'sweep; rm -rf "$tmp"' EXIT
+trap 'clear_progress; exit 130' INT
+
 [ "$total" -eq 0 ] || show_progress
 # shellcheck disable=SC2016
 xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
@@ -298,6 +312,7 @@ xargs -a "$tmp/check" -P "$jobs" -n 1 --no-run-if-empty \
     failure) failed=$((failed + 1)) ;;
     out-of-date) out_of_date=$((out_of_date + 1)) ;;
     esac
+    rm -f "$entry" "$entry.err"
     checked=$((checked + 1))
     show_progress
   done
