@@ -212,13 +212,13 @@ failure_entry() {
 
 check_one() {
   local pkg=$1
-  if [ ! -d "$pkg" ] && ! pkgctl repo clone "$pkg" >&2; then
+  if [ ! -d "$pkg" ] && ! TERM=dumb pkgctl repo clone "$pkg" >&2; then
     failure_entry "$pkg" 'pkgctl repo clone failed'
     return
   fi
   git -C "$pkg" pull --quiet >&2 \
     || printf >&2 '%s: %s: git pull failed\n' "$argv0" "$pkg"
-  { pkgctl version check --json --verbose "$pkg" || true; } \
+  { TERM=dumb pkgctl version check --json --verbose "$pkg" || true; } \
     | jq -es --arg checked_at "$(date -u +%FT%TZ)" \
       'add // [] | .[0] // empty | . + {checked_at: $checked_at}' \
     || failure_entry "$pkg" 'pkgctl version check produced no entry'
