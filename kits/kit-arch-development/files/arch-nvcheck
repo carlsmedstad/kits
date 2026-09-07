@@ -86,27 +86,46 @@ esac
 result_file=$cache_dir/check-$maintainer.json
 
 render() {
-  jq -r '
-    def section($title; $mark; $items):
+  local all_off='' bold='' underline='' green='' red='' yellow=''
+  local purple='' dark_green=''
+  if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && tput setaf 0 > /dev/null 2>&1; then
+    all_off=$(tput sgr0)
+    bold=$(tput bold)
+    underline=$(tput smul)
+    green=$bold$(tput setaf 2)
+    red=$bold$(tput setaf 1)
+    yellow=$bold$(tput setaf 3)
+    purple=$(tput setaf 5)
+    dark_green=$(tput setaf 2)
+  fi
+
+  jq -r --arg all_off "$all_off" --arg bold "$bold" --arg underline "$underline" \
+    --arg green "$green" --arg red "$red" --arg yellow "$yellow" \
+    --arg purple "$purple" --arg dark_green "$dark_green" '
+    def title($text): "\($bold)\($underline)\($text)\($all_off)";
+
+    def section($name; $mark; $items):
       if ($items | length) > 0
-      then $title, ($items[] | " \($mark) \(.)"), ""
+      then title($name), ($items[] | " \($mark) \(.)"), ""
       else empty end;
 
     def count($items):
-      if ($items | length) > 0 then $items | length else empty end;
+      if ($items | length) > 0
+      then "\($bold)\($items | length)\($all_off)"
+      else empty end;
 
     map(select(.status == "failure")) as $failure
     | map(select(.out_of_date)) as $out_of_date
     | map(select(.status != "failure" and (.out_of_date | not))) as $up_to_date
     | if length == 0 then empty else
-        section("Failure"; "x";
-          $failure | map("\(.pkgbase): \(.message)")),
-        section("Out-of-date"; "!";
-          $out_of_date | map("\(.pkgbase): upgrade from version \(.local_version) to \(.upstream_version)")),
-        "Summary",
-        " ✓ Up-to-date: \(count($up_to_date))",
-        " x Failure: \(count($failure))",
-        " ! Out-of-date: \(count($out_of_date))"
+        section("Failure"; "\($red)x\($all_off)";
+          $failure | map("\($bold)\(.pkgbase)\($all_off): \(.message)")),
+        section("Out-of-date"; "\($yellow)!\($all_off)";
+          $out_of_date | map("\($bold)\(.pkgbase)\($all_off): upgrade from version \($purple)\(.local_version)\($all_off) to \($dark_green)\(.upstream_version)\($all_off)")),
+        title("Summary"),
+        " \($green)✓\($all_off) Up-to-date: \(count($up_to_date))",
+        " \($red)x\($all_off) Failure: \(count($failure))",
+        " \($yellow)!\($all_off) Out-of-date: \(count($out_of_date))"
       end
   ' "$result_file"
 }
