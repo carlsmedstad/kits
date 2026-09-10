@@ -7,3 +7,4 @@ src/
 repo/
 gh-pages/
 .mkincl/providers/
+.claude/worktrees/
