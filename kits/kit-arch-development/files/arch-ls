@@ -9,6 +9,9 @@ curl_args_str=${CURL_ARGS:-$curl_args_default}
 # shellcheck disable=SC2206
 curl_args=($curl_args_str)
 
+state_home=${XDG_STATE_HOME:-$HOME/.local/state}
+cookie_jar=$state_home/$argv0/cookies.txt
+
 usage() {
   cat << EOF >&2
 Usage: $argv0 [options...] [repository...]
@@ -17,7 +20,14 @@ Lists packages in specified Arch Linux repositories maintained by
 a particlar user.
 
 Allowed repository values:
-  core core-testing extra extra-testing multilib multilib-testing
+  core core-testing core-staging extra extra-testing extra-staging
+  multilib multilib-testing multilib-staging
+
+The package search serves staging repositories to logged-in callers
+only, so listing one logs in as the maintainer, taking the password
+from gopass at archlinux.org/<maintainer>/password. The session is kept
+in $cookie_jar
+and lasts a fortnight.
 
 Options:
   -m, --maintainer <user>   Maintainer's packages to list
@@ -36,6 +46,7 @@ Examples:
   $argv0 core extra
   $argv0 --jq-query .pkgbase extra-testing
   $argv0 --maintainer carsme extra
+  $argv0 --jq-query .pkgbase extra-staging
 EOF
 }
 
@@ -133,15 +144,58 @@ fix_repo_casing() {
   esac
 }
 
+arch_web_url="https://archlinux.org"
+arch_rpc_search_url="$arch_web_url/packages/search/json/"
+
+request() {
+  curl "${curl_args[@]}" --cookie "$cookie_jar" --cookie-jar "$cookie_jar" "$@"
+}
+
 call_rpc_process_response() {
   local url=${1:?}
-  response=$(curl "${curl_args[@]}" "$url")
-  echo "$response" | jq -rc ".results[] | $jq_query"
+  local query=${2:-$jq_query}
+  response=$(request "$url")
+  if [ "$(echo "$response" | jq -r .valid)" != true ]; then
+    printf >&2 '%s: the search rejected the query\n' "$argv0"
+    exit 1
+  fi
+  echo "$response" | jq -rc ".results[] | $query"
   num_pages=$(echo "$response" | jq -r .num_pages)
   if [ "$num_pages" != null ]; then
     for page in $(seq 2 "$num_pages"); do
-      curl "${curl_args[@]}" "$url&page=$page" | jq -rc ".results[] | $jq_query"
+      request "$url&page=$page" | jq -rc ".results[] | $query"
     done
+  fi
+}
+
+log_in() {
+  local token
+  token=$(request "$arch_web_url/login/" \
+    | sed -n 's/.*name="csrfmiddlewaretoken" value="\([^"]*\)".*/\1/p' | sed -n 1p)
+  # The password reaches curl on stdin so that it never sits in argv.
+  gopass show --password "archlinux.org/$maintainer/password" \
+    | request --output /dev/null --referer "$arch_web_url/login/" \
+      --data-urlencode "csrfmiddlewaretoken=$token" \
+      --data-urlencode "username=$maintainer" \
+      --data-urlencode password@- \
+      "$arch_web_url/login/"
+}
+
+# A staging repository is not among the search form's choices for an
+# anonymous caller, so it answers valid=false rather than an empty list.
+authenticated() {
+  [ "$(request "$arch_rpc_search_url?repo=Extra-Staging&limit=1" | jq -r .valid)" = true ]
+}
+
+ensure_session() {
+  mkdir -p "$(dirname "$cookie_jar")"
+  touch "$cookie_jar"
+  chmod 600 "$cookie_jar"
+  authenticated && return 0
+  log_in
+  if ! authenticated; then
+    printf >&2 '%s: could not log in to %s as %s\n' "$argv0" "$arch_web_url" "$maintainer"
+    exit 1
   fi
 }
 
@@ -149,10 +203,17 @@ flagged_param=""
 [ "$flagged" = yes ] && flagged_param="&flagged=Flagged"
 [ "$flagged" = no ] && flagged_param="&flagged=Not+Flagged"
 
+for repo in "$@"; do
+  fix_repo_casing "$repo" > /dev/null
+done
+
+case $* in
+*-staging*) ensure_session ;;
+esac
+
 {
   for repo in "$@"; do
-    repo_cased=$(fix_repo_casing "$repo")
-    arch_rpc_search_url="https://archlinux.org/packages/search/json/"
-    call_rpc_process_response "$arch_rpc_search_url?maintainer=$maintainer&repo=$repo_cased$flagged_param"
+    call_rpc_process_response \
+      "$arch_rpc_search_url?maintainer=$maintainer&repo=$(fix_repo_casing "$repo")$flagged_param"
   done
 } | sort | uniq
