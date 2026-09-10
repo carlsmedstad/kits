@@ -4,6 +4,9 @@ set -euo pipefail
 
 argv0=arch-rdepends
 
+cache_home=${XDG_CACHE_HOME:-$HOME/.cache}
+nvcheck_default=$cache_home/arch-nvcheck/check-$USER.json
+
 usage() {
   cat << EOF >&2
 Usage: $argv0 [options...] pkgname...
@@ -28,6 +31,11 @@ Columns:
   repository    Repository holding it
   target        The given package it depends on
   type          Dependency types it uses, comma-separated
+  version       Its version in the arch-nvcheck result file
+  upstream      The upstream version arch-nvcheck found
+
+The version columns and --out-of-date join on pkgbase and print - for
+packages missing from the result file.
 
 Options:
   -c, --columns <cols>    Comma-separated columns to print
@@ -37,6 +45,10 @@ Options:
                           default: all
   -r, --repo <repos>      Comma-separated repositories to search
                           default: all synced databases
+  -o, --out-of-date       Only list packages arch-nvcheck flags as
+                          out of date
+      --nvcheck <file>    arch-nvcheck result file
+                          default: $nvcheck_default
       --dbpath <path>     Pacman database path
                           default: pacman-conf DBPath
       --header            Print header
@@ -46,18 +58,20 @@ Examples:
   $argv0 cmocka
   $argv0 --columns pkgbase fmt | xargs arch-rebuild-order
   $argv0 --deptype makedepend,checkdepend --columns pkgbase,type cmake
-  $argv0 --columns target,pkgbase fmt spdlog
+  $argv0 --out-of-date --columns pkgbase,version,upstream fmt
 EOF
 }
 
 columns=pkgname,repository,type
 header=0
+out_of_date=0
+nvcheck=$nvcheck_default
 deptypes=
 repos=
 dbpath=
 
-opt_short='c:t:r:h'
-opt_long='columns:,deptype:,repo:,dbpath:,header,help'
+opt_short='c:t:r:oh'
+opt_long='columns:,deptype:,repo:,out-of-date,nvcheck:,dbpath:,header,help'
 if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
   eval set -- "$opts"
 fi
@@ -75,6 +89,13 @@ while true; do
   -r | --repo)
     shift
     repos=${1:-}
+    ;;
+  -o | --out-of-date)
+    out_of_date=1
+    ;;
+  --nvcheck)
+    shift
+    nvcheck=${1:-}
     ;;
   --dbpath)
     shift
@@ -112,10 +133,12 @@ keycols=
 header_line=
 typepos=0
 position=0
+need_nvcheck=$out_of_date
 declare -A seen=()
 IFS=, read -ra requested <<< "$columns"
 for column in "${requested[@]}"; do
   case $column in
+  version | upstream) need_nvcheck=1 ;;
   pkgname | pkgbase | repository | target | type) ;;
   *)
     printf >&2 '%s: %s: invalid column\n' "$argv0" "$column"
@@ -135,6 +158,11 @@ for column in "${requested[@]}"; do
     keycols+=${keycols:+,}$column
   fi
 done
+
+if [ "$need_nvcheck" = 1 ] && [ ! -f "$nvcheck" ]; then
+  printf >&2 '%s: %s: does not exist, run arch-nvcheck first\n' "$argv0" "$nvcheck"
+  exit 1
+fi
 
 letters=DOMC
 if [ -n "$deptypes" ]; then
@@ -189,6 +217,14 @@ format() {
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
+: > "$tmp/nvcheck"
+if [ "$need_nvcheck" = 1 ]; then
+  jq -r '
+    .[] | [.pkgbase, (.local_version // "-"), (.upstream_version // "-"),
+      (if .out_of_date then "yes" else "no" end)] | @tsv
+  ' "$nvcheck" > "$tmp/nvcheck"
+fi
+
 for db in "${dbs[@]}"; do
   repo=$(basename "$db" .db)
   printf '%%REPO%%\n%s\n\n' "$repo"
@@ -196,7 +232,7 @@ for db in "${dbs[@]}"; do
 done > "$tmp/desc"
 
 awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
-  -v withtype="$typepos" '
+  -v withtype="$typepos" -v onlyoutdated="$out_of_date" '
   function bare(dep) {
     sub(/[<>=:].*/, "", dep)
     return dep
@@ -205,6 +241,8 @@ awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
     if (column == "pkgname") return pkgname
     if (column == "pkgbase") return pkgbase
     if (column == "repository") return repo
+    if (column == "version") return (pkgbase in localver) ? localver[pkgbase] : "-"
+    if (column == "upstream") return (pkgbase in upstream) ? upstream[pkgbase] : "-"
     return target
   }
   BEGIN {
@@ -216,7 +254,14 @@ awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
     rank["%MAKEDEPENDS%"] = 2; letter["%MAKEDEPENDS%"] = "M"
     rank["%CHECKDEPENDS%"] = 3; letter["%CHECKDEPENDS%"] = "C"
   }
-  FNR == 1 && NR != FNR {
+  ARGIND == 1 {
+    split($0, entry, "\t")
+    localver[entry[1]] = entry[2]
+    upstream[entry[1]] = entry[3]
+    if (entry[4] == "yes") outdated[entry[1]] = 1
+    next
+  }
+  ARGIND == 3 && FNR == 1 {
     for (name in provides) if (!(name in want)) want[name] = provides[name]
   }
   /^%[A-Z0-9]+%$/ { section = $0; next }
@@ -224,12 +269,13 @@ awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
   section == "%REPO%" { repo = $0; next }
   section == "%NAME%" { pkgname = $0; pkgbase = $0; istarget = $0 in want; next }
   section == "%BASE%" { pkgbase = $0; next }
-  NR == FNR {
+  ARGIND == 2 {
     if (istarget && section == "%PROVIDES%") provides[bare($0)] = pkgname
     next
   }
   !(section in rank) { next }
   !index(letters, letter[section]) { next }
+  onlyoutdated && !(pkgbase in outdated) { next }
   bare($0) in want {
     out = ""
     for (i = 1; i <= nkeys; i++)
@@ -238,7 +284,7 @@ awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
     if (withtype) out = (nkeys ? out "\t" : "") rank[section]
     print out
   }
-' "$tmp/desc" "$tmp/desc" | LC_ALL=C sort -u > "$tmp/matches"
+' "$tmp/nvcheck" "$tmp/desc" "$tmp/desc" | LC_ALL=C sort -u > "$tmp/matches"
 
 {
   if [ "$header" = 1 ]; then
