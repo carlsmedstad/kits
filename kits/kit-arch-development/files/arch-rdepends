@@ -239,7 +239,9 @@ fi
 for db in "${dbs[@]}"; do
   repo=$(basename "$db" .db)
   printf '%%REPO%%\n%s\n\n' "$repo"
-  bsdtar -xOf "$db" --include='*/desc'
+  # A repository database holds nothing but desc members, and asking
+  # bsdtar for them by name makes it fail on an empty repository.
+  bsdtar -xOf "$db"
 done > "$tmp/desc"
 
 awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
