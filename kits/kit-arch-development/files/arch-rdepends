@@ -1,0 +1,275 @@
+#!/bin/bash
+
+set -euo pipefail
+
+argv0=arch-rdepends
+
+usage() {
+  cat << EOF >&2
+Usage: $argv0 [options...] pkgname...
+
+Lists the packages that depend on the given packages, including make
+and check dependencies, the way the package details page on
+https://archlinux.org/ does. Packages depending on something the given
+packages provide are listed too.
+
+The dependencies are read from the pacman sync databases, so only the
+repositories pacman is configured to use are searched - enable
+multilib in pacman.conf to cover it, and run pacman -Sy to refresh.
+
+Output is deduplicated on the printed columns, so --columns pkgbase
+prints every pkgbase to rebuild exactly once. Columns are aligned on a
+terminal and tab-separated when piped, so pipe through cat to see the
+tabs.
+
+Columns:
+  pkgname       Name of the package that depends on the target
+  pkgbase       Its pkgbase
+  repository    Repository holding it
+  target        The given package it depends on
+  type          Dependency types it uses, comma-separated
+
+Options:
+  -c, --columns <cols>    Comma-separated columns to print
+                          default: pkgname,repository,type
+  -t, --deptype <types>   Comma-separated dependency types to list:
+                          depend, optdepend, makedepend, checkdepend
+                          default: all
+  -r, --repo <repos>      Comma-separated repositories to search
+                          default: all synced databases
+      --dbpath <path>     Pacman database path
+                          default: pacman-conf DBPath
+      --header            Print header
+  -h, --help              Display this help message and exit
+
+Examples:
+  $argv0 cmocka
+  $argv0 --columns pkgbase fmt | xargs arch-rebuild-order
+  $argv0 --deptype makedepend,checkdepend --columns pkgbase,type cmake
+  $argv0 --columns target,pkgbase fmt spdlog
+EOF
+}
+
+columns=pkgname,repository,type
+header=0
+deptypes=
+repos=
+dbpath=
+
+opt_short='c:t:r:h'
+opt_long='columns:,deptype:,repo:,dbpath:,header,help'
+if opts=$(getopt -o "$opt_short" -l "$opt_long" -n "$argv0" -- "$@"); then
+  eval set -- "$opts"
+fi
+
+while true; do
+  case $1 in
+  -c | --columns)
+    shift
+    columns=${1:-}
+    ;;
+  -t | --deptype)
+    shift
+    deptypes=${1:-}
+    ;;
+  -r | --repo)
+    shift
+    repos=${1:-}
+    ;;
+  --dbpath)
+    shift
+    dbpath=${1:-}
+    ;;
+  --header)
+    header=1
+    ;;
+  -h | --help)
+    usage
+    exit
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+if [ "$#" -eq 0 ]; then
+  printf >&2 '%s: no package supplied\n' "$argv0"
+  exit 1
+fi
+
+if [ -z "$columns" ]; then
+  printf >&2 '%s: no column supplied\n' "$argv0"
+  exit 1
+fi
+
+keycols=
+header_line=
+typepos=0
+position=0
+declare -A seen=()
+IFS=, read -ra requested <<< "$columns"
+for column in "${requested[@]}"; do
+  case $column in
+  pkgname | pkgbase | repository | target | type) ;;
+  *)
+    printf >&2 '%s: %s: invalid column\n' "$argv0" "$column"
+    exit 1
+    ;;
+  esac
+  if [ -n "${seen[$column]:-}" ]; then
+    printf >&2 '%s: %s: duplicate column\n' "$argv0" "$column"
+    exit 1
+  fi
+  seen[$column]=1
+  position=$((position + 1))
+  header_line+=${header_line:+$'\t'}$column
+  if [ "$column" = type ]; then
+    typepos=$position
+  else
+    keycols+=${keycols:+,}$column
+  fi
+done
+
+letters=DOMC
+if [ -n "$deptypes" ]; then
+  letters=
+  IFS=, read -ra requested <<< "$deptypes"
+  for deptype in "${requested[@]}"; do
+    case $deptype in
+    depend) letters+=D ;;
+    optdepend) letters+=O ;;
+    makedepend) letters+=M ;;
+    checkdepend) letters+=C ;;
+    *)
+      printf >&2 '%s: %s: invalid dependency type\n' "$argv0" "$deptype"
+      exit 1
+      ;;
+    esac
+  done
+fi
+
+[ -n "$dbpath" ] || dbpath=$(pacman-conf DBPath)
+syncdir=${dbpath%/}/sync
+
+dbs=()
+if [ -n "$repos" ]; then
+  IFS=, read -ra requested <<< "$repos"
+  for repo in "${requested[@]}"; do
+    if [ ! -f "$syncdir/$repo.db" ]; then
+      printf >&2 '%s: %s: no database in %s, run pacman -Sy\n' \
+        "$argv0" "$repo" "$syncdir"
+      exit 1
+    fi
+    dbs+=("$syncdir/$repo.db")
+  done
+else
+  shopt -s nullglob
+  dbs=("$syncdir"/*.db)
+  shopt -u nullglob
+  if [ "${#dbs[@]}" -eq 0 ]; then
+    printf >&2 '%s: no databases in %s, run pacman -Sy\n' "$argv0" "$syncdir"
+    exit 1
+  fi
+fi
+
+format() {
+  if [ -t 1 ]; then
+    column --table --separator "$(printf '\t')"
+  else
+    cat
+  fi
+}
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+for db in "${dbs[@]}"; do
+  repo=$(basename "$db" .db)
+  printf '%%REPO%%\n%s\n\n' "$repo"
+  bsdtar -xOf "$db" --include='*/desc'
+done > "$tmp/desc"
+
+awk -v targets="$*" -v letters="$letters" -v keycols="$keycols" \
+  -v withtype="$typepos" '
+  function bare(dep) {
+    sub(/[<>=:].*/, "", dep)
+    return dep
+  }
+  function value(column, target) {
+    if (column == "pkgname") return pkgname
+    if (column == "pkgbase") return pkgbase
+    if (column == "repository") return repo
+    return target
+  }
+  BEGIN {
+    nkeys = split(keycols, key, ",")
+    split(targets, list, " ")
+    for (i in list) want[list[i]] = list[i]
+    rank["%DEPENDS%"] = 0; letter["%DEPENDS%"] = "D"
+    rank["%OPTDEPENDS%"] = 1; letter["%OPTDEPENDS%"] = "O"
+    rank["%MAKEDEPENDS%"] = 2; letter["%MAKEDEPENDS%"] = "M"
+    rank["%CHECKDEPENDS%"] = 3; letter["%CHECKDEPENDS%"] = "C"
+  }
+  FNR == 1 && NR != FNR {
+    for (name in provides) if (!(name in want)) want[name] = provides[name]
+  }
+  /^%[A-Z0-9]+%$/ { section = $0; next }
+  NF == 0 { next }
+  section == "%REPO%" { repo = $0; next }
+  section == "%NAME%" { pkgname = $0; pkgbase = $0; istarget = $0 in want; next }
+  section == "%BASE%" { pkgbase = $0; next }
+  NR == FNR {
+    if (istarget && section == "%PROVIDES%") provides[bare($0)] = pkgname
+    next
+  }
+  !(section in rank) { next }
+  !index(letters, letter[section]) { next }
+  bare($0) in want {
+    out = ""
+    for (i = 1; i <= nkeys; i++)
+      out = (i == 1) ? value(key[i], want[bare($0)]) \
+        : out "\t" value(key[i], want[bare($0)])
+    if (withtype) out = (nkeys ? out "\t" : "") rank[section]
+    print out
+  }
+' "$tmp/desc" "$tmp/desc" | LC_ALL=C sort -u > "$tmp/matches"
+
+{
+  if [ "$header" = 1 ]; then
+    printf '%s\n' "$header_line"
+  fi
+  if [ "$typepos" -eq 0 ]; then
+    cat "$tmp/matches"
+  else
+    awk -F '\t' -v typepos="$typepos" '
+      function emit(   n, fields, i, index_, value) {
+        n = split(key, fields, "\t")
+        index_ = 0
+        for (i = 1; i <= n + 1; i++) {
+          value = (i == typepos) ? deptypes : fields[++index_]
+          out = (i == 1) ? value : out "\t" value
+        }
+        print out
+      }
+      BEGIN { split("depend optdepend makedepend checkdepend", label, " ") }
+      {
+        line = ""
+        for (i = 1; i < NF; i++) line = (i == 1) ? $i : line "\t" $i
+        if (!started || line != key) {
+          if (started) emit()
+          key = line
+          deptypes = ""
+          started = 1
+        }
+        deptypes = deptypes (deptypes ? "," : "") label[$NF + 1]
+      }
+      END { if (started) emit() }
+    ' "$tmp/matches"
+  fi
+} | format
