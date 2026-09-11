@@ -46,6 +46,7 @@ package() {
   install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-hardening.conf
   install -vDm644 -t "$pkgdir/etc/sysctl.d" files/99-zram.conf
   install -vDm644 -t "$pkgdir/etc/tlp.d" files/15-cpu-perf-on-ac.conf
+  install -vDm644 files/tmpfiles-tmp.conf "$pkgdir/etc/tmpfiles.d/tmp.conf"
   install -vDm644 files/resolved.conf \
     "$pkgdir/etc/systemd/resolved.conf.d/10-kit-base-system.conf"
   install -vDm644 -t "$pkgdir/etc/systemd" files/zram-generator.conf
