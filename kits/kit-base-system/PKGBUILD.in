@@ -40,6 +40,8 @@ package() {
     "$pkgdir/usr/share/libalpm/hooks/95-kit-base-system-mkinitcpio.hook"
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/20-wired.network
   install -vDm644 -t "$pkgdir/etc/systemd/network" files/25-wireless.network
+  install -vDm644 files/networkd-wait-online.conf \
+    "$pkgdir/etc/systemd/system/systemd-networkd-wait-online.service.d/10-kit-base-system.conf"
   install -vDm644 -t "$pkgdir/etc/udev/rules.d" files/99-usb-root-hub-wakeup.rules
   install -vdm750 "$pkgdir/etc/sudoers.d"
   install -vDm440 files/sudoers-wheel "$pkgdir/etc/sudoers.d/kit-wheel"
